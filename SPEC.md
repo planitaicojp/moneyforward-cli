@@ -930,3 +930,392 @@ const (
     AccountTypeUnknown  AccountType = "unknown"
 )
 ```
+
+---
+
+## 7. Phase 1 実装計画: 認証基盤
+
+Phase 0 完了 (root, version, completion, errors, output, basic config) を前提に、
+全サービスコマンドの基盤となる認証システムを構築する。
+conoha-cli (`~/dev/crowdy/conoha-cli`) のアーキテクチャを踏襲し、OAuth2 Authorization Code + PKCE に対応。
+
+### 7.1 conoha-cli との差分
+
+| 観点 | conoha-cli | mf CLI |
+|------|-----------|--------|
+| 認証方式 | パスワード → Keystone トークン | OAuth2 Authorization Code + PKCE |
+| トークン更新 | 保存パスワードで再認証 | refresh_token grant |
+| credentials.yaml | パスワード保存 | client_secret 保存 |
+| tokens.yaml | プロファイルごとに1トークン | プロファイル×サービスで複数トークン |
+| ログインフロー | 非対話 (パスワード入力) | ブラウザ起動 + ローカルコールバック |
+| マルチサービス | リージョンごとに1エンドポイント | サービスごとに異なる OAuth エンドポイント |
+| PKCE | 不要 | 必須 (code_verifier/code_challenge S256) |
+
+### 7.2 ファイル一覧
+
+#### 新規作成 (10 ファイル)
+
+| ファイル | conoha 移植度 | 責務 |
+|---------|-------------|------|
+| `internal/config/credentials.go` | 95% | client_secret の保存・読込 (credentials.yaml, 0600) |
+| `internal/config/tokens.go` | 60% | サービス別トークン管理 (tokens.yaml, 0600) |
+| `internal/api/oauth.go` | **新規** | PKCE生成, 認可URL構築, コールバックサーバー, トークン交換・リフレッシュ |
+| `internal/api/client.go` | 80% | HTTP クライアント (Bearer auth, リトライ, デバッグ) |
+| `internal/api/debug.go` | 90% | リクエスト/レスポンスのデバッグログ (MF_DEBUG) |
+| `internal/prompt/prompt.go` | 95% | 対話入力 (String, Password, Confirm) |
+| `internal/prompt/select.go` | 95% | 選択プロンプト (promptui) |
+| `cmd/cmdutil/client.go` | 70% | NewClient(cmd, service) ファクトリ |
+| `cmd/auth/auth.go` | 40% | auth login\|logout\|status\|list\|switch\|remove\|token |
+| `cmd/config/config.go` | 80% | config get\|set\|list\|path |
+
+#### 修正 (2 ファイル)
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `internal/config/config.go` | 環境変数定数追加 (MF_CLIENT_ID, MF_CLIENT_SECRET, MF_ACCESS_TOKEN 等) |
+| `cmd/root.go` | auth, config サブコマンド登録 |
+
+### 7.3 tokens.yaml 構造設計
+
+サービスごとにトークンを分離管理する。Invoice 認証後に Expense を使う際、再ログイン不要。
+
+```yaml
+profiles:
+  default:
+    services:
+      invoice:
+        access_token: "eyJ..."
+        refresh_token: "abc..."
+        expires_at: "2026-03-14T00:00:00Z"
+        scope: "mfc/invoice/data.read mfc/invoice/data.write"
+      expense:
+        access_token: "eyJ..."
+        refresh_token: "def..."
+        expires_at: "2026-03-14T00:00:00Z"
+        scope: "office_setting:write transaction:write report:write user_setting:write account:write public_resource:read"
+```
+
+**Go struct**:
+
+```go
+type TokenStore struct {
+    Profiles map[string]ProfileTokens `yaml:"profiles"`
+}
+
+type ProfileTokens struct {
+    Services map[string]TokenEntry `yaml:"services,omitempty"`
+}
+
+type TokenEntry struct {
+    AccessToken  string    `yaml:"access_token"`
+    RefreshToken string    `yaml:"refresh_token"`
+    ExpiresAt    time.Time `yaml:"expires_at"`
+    Scope        string    `yaml:"scope"`
+}
+```
+
+**メソッド**: `Get(profile, service)`, `Set(profile, service, entry)`, `Delete(profile)`, `DeleteService(profile, service)`, `IsValid(profile, service)` (5分バッファ), `ListServices(profile)`, `Load()`, `Save()`
+
+### 7.4 credentials.yaml 構造設計
+
+```yaml
+profiles:
+  default:
+    client_secret: "your-client-secret"
+```
+
+**Go struct**:
+
+```go
+type CredentialsStore struct {
+    Profiles map[string]Credentials `yaml:"profiles"`
+}
+
+type Credentials struct {
+    ClientSecret string `yaml:"client_secret"`
+}
+```
+
+**メソッド**: `Get(profile)`, `Set(profile, creds)`, `Delete(profile)`, `Load()`, `Save()` — conoha-cli の `credentials.go` をほぼそのまま移植。Password → ClientSecret に変更のみ。
+
+### 7.5 OAuth2 ログインフロー詳細
+
+```
+mf auth login --service invoice
+  │
+  ├─ 1. config.yaml から profile の client_id 取得 (なければプロンプト)
+  ├─ 2. credentials.yaml から client_secret 取得 (なければプロンプト)
+  ├─ 3. サービス決定 (--service フラグ or 対話選択)
+  ├─ 4. スコープ決定 (--scopes フラグ or サービスデフォルト)
+  │
+  ├─ 5. PKCE 生成
+  │     code_verifier: 43-128文字のランダム文字列 (crypto/rand)
+  │     code_challenge: SHA256(code_verifier) → base64url エンコード
+  │
+  ├─ 6. localhost:38080 でコールバックサーバー起動
+  │     GET /callback?code=XXX → codeCh に送信, HTML 成功ページ表示
+  │     GET /callback?error=YYY → errCh に送信, HTML エラーページ表示
+  │     5分タイムアウト
+  │
+  ├─ 7. 認可 URL をブラウザで開く
+  │     WSL2: cmd.exe /c start <url>
+  │     Linux: xdg-open <url>
+  │     macOS: open <url>
+  │     失敗時: URL を stderr に表示し手動コピーを促す
+  │
+  ├─ 8. ユーザーが MF Cloud で承認 → /callback?code=XXX 受信
+  │
+  ├─ 9. トークン交換
+  │     POST {tokenURL}
+  │     Content-Type: application/x-www-form-urlencoded
+  │     Body: grant_type=authorization_code
+  │           &code={code}
+  │           &client_id={client_id}
+  │           &client_secret={client_secret}     ← client_secret_post 方式
+  │           &redirect_uri=http://localhost:38080/callback
+  │           &code_verifier={code_verifier}     ← PKCE
+  │
+  ├─ 10. レスポンスから TokenEntry 構築
+  │      ExpiresAt = time.Now().Add(time.Duration(expires_in) * time.Second)
+  │
+  └─ 11. 永続化
+        config.yaml: プロファイル (client_id, scopes)
+        credentials.yaml: client_secret
+        tokens.yaml: サービス別トークン
+        stdout: "✓ Logged in as {profile} for {service} (expires in 1 hour)"
+```
+
+### 7.6 トークンリフレッシュフロー
+
+```
+cmdutil.NewClient(cmd, "invoice")
+  → EnsureToken(profile, "invoice", cfg, creds, tokens)
+    │
+    ├─ 1. MF_ACCESS_TOKEN 環境変数 → そのまま返す (キャッシュスキップ)
+    │
+    ├─ 2. tokens.IsValid(profile, "invoice")
+    │     = expires_at - 5分 > now
+    │     → true: キャッシュされた access_token を返す
+    │
+    ├─ 3. entry.RefreshToken が存在
+    │     → POST {tokenURL}
+    │       grant_type=refresh_token
+    │       &refresh_token={refresh_token}
+    │       &client_id={client_id}
+    │       &client_secret={client_secret}
+    │     → 成功: tokens.yaml 更新, 新 access_token 返す
+    │     → 失敗 (refresh_token 期限切れ等):
+    │       AuthError("session expired, run 'mf auth login --service invoice'")
+    │
+    └─ 4. トークンなし
+          → AuthError("not authenticated, run 'mf auth login --service invoice'")
+```
+
+### 7.7 サービス別 OAuth エンドポイントマップ
+
+```go
+type ServiceConfig struct {
+    AuthURL       string
+    TokenURL      string
+    BaseURL       string
+    DefaultScopes []string
+}
+
+var Services = map[string]ServiceConfig{
+    "invoice": {
+        AuthURL:       "https://api.biz.moneyforward.com/authorize",
+        TokenURL:      "https://api.biz.moneyforward.com/token",
+        BaseURL:       "https://invoice.moneyforward.com/api/v3",
+        DefaultScopes: []string{"mfc/invoice/data.read", "mfc/invoice/data.write"},
+    },
+    "expense": {
+        AuthURL:       "https://expense.moneyforward.com/oauth/authorize",
+        TokenURL:      "https://expense.moneyforward.com/oauth/token",
+        BaseURL:       "https://expense.moneyforward.com/api/external/v1",
+        DefaultScopes: []string{"office_setting:write", "transaction:write", "report:write", "user_setting:write", "account:write", "public_resource:read"},
+    },
+    "payable": {
+        AuthURL:       "https://payable.moneyforward.com/oauth/authorize",
+        TokenURL:      "https://payable.moneyforward.com/oauth/token",
+        BaseURL:       "https://payable.moneyforward.com/api/external/v1",
+        DefaultScopes: []string{"office_setting:write", "transaction:write", "report:write", "user_setting:write", "account:write", "public_resource:read"},
+    },
+}
+```
+
+### 7.8 HTTP クライアント設計
+
+```go
+type Client struct {
+    HTTP      *http.Client  // Timeout: 30s
+    Token     string        // Bearer token
+    BaseURL   string        // サービス別 Base URL
+    UserAgent string        // "mf-cli/{version}"
+    Debug     bool          // MF_DEBUG 環境変数
+}
+
+// メソッド
+func (c *Client) Get(path string, params url.Values) (*http.Response, error)
+func (c *Client) Post(path string, body any) (*http.Response, error)
+func (c *Client) Patch(path string, body any) (*http.Response, error)
+func (c *Client) Delete(path string) (*http.Response, error)
+func (c *Client) Do(req *http.Request) (*http.Response, error)  // リトライ: 429/5xx, 最大3回, exponential backoff
+```
+
+conoha-cli の `client.go` から移植。変更点:
+- `X-Auth-Token` → `Authorization: Bearer {token}`
+- `TenantID` / `Region` 削除
+- `BaseURL` はサービスごとに決定
+
+### 7.9 cmdutil.NewClient 設計
+
+```go
+func NewClient(cmd *cobra.Command, service string) (*api.Client, error) {
+    // 1. MF_ACCESS_TOKEN 環境変数があればショートカット
+    if token := os.Getenv("MF_ACCESS_TOKEN"); token != "" {
+        svcCfg := api.Services[service]
+        return api.NewClient(token, svcCfg.BaseURL), nil
+    }
+
+    // 2. プロファイル解決: --profile フラグ > MF_PROFILE > config.active_profile
+    profile := resolveProfile(cmd)
+
+    // 3. 設定ファイル読込
+    cfg, _ := config.Load()
+    creds, _ := config.LoadCredentials()
+    tokens, _ := config.LoadTokens()
+
+    // 4. トークン確保 (自動リフレッシュ含む)
+    token, err := api.EnsureToken(profile, service, cfg, creds, tokens)
+    if err != nil {
+        return nil, err // AuthError → 終了コード 2
+    }
+
+    // 5. クライアント構築
+    svcCfg := api.Services[service]
+    return api.NewClient(token, svcCfg.BaseURL), nil
+}
+```
+
+### 7.10 ブラウザ起動 (WSL2 対応)
+
+```go
+func openBrowser(url string) error {
+    var cmd *exec.Cmd
+    switch runtime.GOOS {
+    case "linux":
+        // WSL2 判定: /proc/version に "microsoft" が含まれるか
+        if isWSL() {
+            cmd = exec.Command("cmd.exe", "/c", "start", url)
+        } else {
+            cmd = exec.Command("xdg-open", url)
+        }
+    case "darwin":
+        cmd = exec.Command("open", url)
+    case "windows":
+        cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+    }
+    return cmd.Start()
+}
+
+func isWSL() bool {
+    data, err := os.ReadFile("/proc/version")
+    if err != nil {
+        return false
+    }
+    return strings.Contains(strings.ToLower(string(data)), "microsoft")
+}
+```
+
+### 7.11 環境変数一覧
+
+| 環境変数 | 説明 | 使用箇所 |
+|---------|------|---------|
+| `MF_PROFILE` | アクティブプロファイル | cmdutil.NewClient |
+| `MF_CLIENT_ID` | OAuth2 Client ID | auth login (プロンプトスキップ) |
+| `MF_CLIENT_SECRET` | OAuth2 Client Secret | auth login, EnsureToken |
+| `MF_ACCESS_TOKEN` | アクセストークン直接指定 | cmdutil.NewClient (全キャッシュスキップ) |
+| `MF_FORMAT` | 出力形式 | root.go (既存) |
+| `MF_CONFIG_DIR` | 設定ディレクトリ | config.Load |
+| `MF_NO_INPUT` | 非対話モード | auth login (プロンプト無効化) |
+| `MF_DEBUG` | デバッグ出力 | api/debug.go |
+| `MF_CALLBACK_PORT` | コールバックポート | auth login (default: 38080) |
+
+### 7.12 コミット計画
+
+#### Commit 1: Config layer
+
+```
+internal/config/credentials.go   — CredentialsStore (Get/Set/Delete/Load/Save)
+internal/config/tokens.go        — TokenStore (Get/Set/Delete/IsValid/Load/Save, multi-service)
+internal/config/config.go        — 環境変数定数追加
+go.mod                           — golang.org/x/term, github.com/manifoldco/promptui 追加
+```
+
+#### Commit 2: API layer + prompt
+
+```
+internal/api/debug.go            — デバッグログ (MF_DEBUG, sensitive masking)
+internal/api/client.go           — HTTP クライアント (Bearer, リトライ 429/5xx, User-Agent)
+internal/api/oauth.go            — PKCE, ServiceConfig, コールバックサーバー,
+                                   ExchangeCode, RefreshToken, EnsureToken
+internal/prompt/prompt.go        — String/Password/Confirm
+internal/prompt/select.go        — Select (promptui)
+cmd/cmdutil/client.go            — NewClient(cmd, service)
+```
+
+#### Commit 3: Commands
+
+```
+cmd/auth/auth.go                 — login, logout, status, list, switch, remove, token
+cmd/config/config.go             — get, set, list, path
+cmd/root.go                      — auth, config サブコマンド登録
+```
+
+#### Commit 4: Tests
+
+```
+internal/config/tokens_test.go      — Set/Get/IsValid/multi-service/round-trip
+internal/config/credentials_test.go — Set/Get/Delete
+internal/api/oauth_test.go          — PKCE 生成, コールバックサーバー (httptest),
+                                      トークン交換 mock (httptest.NewServer)
+internal/api/client_test.go         — Bearer ヘッダー, リトライ, エラーパース
+```
+
+### 7.13 依存追加
+
+```
+golang.org/x/term                # Password 入力 (noecho)
+github.com/manifoldco/promptui   # 対話 Select プロンプト
+```
+
+### 7.14 注意事項
+
+- **WSL2**: `cmd.exe /c start` フォールバック必要。`isWSL()` で `/proc/version` を確認
+- **コールバックポート**: デフォルト 38080, `--port` / `MF_CALLBACK_PORT` で変更可能
+- **`--no-input` モード**: `--service` フラグ必須。プロンプト全無効化
+- **`office_id`**: ログイン時不要。後で `mf config set profiles.default.office_id <id>` で設定
+- **並行リフレッシュ**: v1 は last-writer-wins で許容 (CLI の一般的な使用パターンでは問題なし)
+- **リフレッシュ失敗**: refresh_token 期限切れ (540日後) 時は `mf auth login` の再実行を促すエラーメッセージ
+
+### 7.15 検証方法
+
+```bash
+# ビルド・静的解析
+make build && make lint && make test
+
+# 認証フロー (実際の MF Cloud アカウント必要)
+mf auth login --service invoice        # ブラウザ起動, コールバック受信
+mf auth status                         # トークン状態表示
+mf auth token --service invoice        # access_token 出力
+mf auth list                           # プロファイル一覧
+
+# 設定管理
+mf config set format json
+mf config get format                   # → "json"
+mf config list                         # 全設定表示
+mf config path                         # → ~/.config/mf/
+
+# トークンリフレッシュ (access_token 期限切れ後)
+# → 自動リフレッシュされ、新トークンで API コール成功
+```
