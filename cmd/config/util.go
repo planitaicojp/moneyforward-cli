@@ -1,13 +1,12 @@
 package config
 
 import (
-	"github.com/planitaicojp/moneyforward-cli/internal/config"
+	"github.com/spf13/cobra"
+
+	"github.com/planitaicojp/moneyforward-cli/cmd/cmdutil"
 )
 
-// getActiveProfile returns the active profile name from config.
-func getActiveProfile(cfg *config.Config) string {
-	if cfg.ActiveProfile != "" {
-		return cfg.ActiveProfile
-	}
-	return "default"
+// getProfile resolves the active profile, respecting --profile flag and MF_PROFILE env var.
+func getProfile(cmd *cobra.Command) string {
+	return cmdutil.GetProfile(cmd)
 }

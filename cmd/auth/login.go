@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/planitaicojp/moneyforward-cli/cmd/cmdutil"
 	"github.com/planitaicojp/moneyforward-cli/internal/api"
 	"github.com/planitaicojp/moneyforward-cli/internal/config"
 	cerrors "github.com/planitaicojp/moneyforward-cli/internal/errors"
@@ -37,7 +38,7 @@ func init() {
 }
 
 func runLogin(cmd *cobra.Command, args []string) error {
-	profile := getProfile(cmd)
+	profile := cmdutil.GetProfile(cmd)
 	noInput := config.IsNoInput()
 
 	// Validate service.
@@ -93,7 +94,10 @@ func runLogin(cmd *cobra.Command, args []string) error {
 			return &cerrors.ValidationError{Field: "client_secret", Message: "client secret cannot be empty"}
 		}
 		// Offer to save.
-		save, _ := prompt.Confirm("Save client secret to credentials file")
+		save, err := prompt.Confirm("Save client secret to credentials file")
+		if err != nil {
+			return err
+		}
 		if save {
 			creds.SetClientSecret(profile, clientSecret)
 			if saveErr := creds.Save(); saveErr != nil {
@@ -164,21 +168,4 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// getProfile reads the --profile flag from the root persistent flags.
-func getProfile(cmd *cobra.Command) string {
-	if f := cmd.Root().PersistentFlags().Lookup("profile"); f != nil && f.Value.String() != "" {
-		return f.Value.String()
-	}
-	if p := config.EnvOr(config.EnvProfile, ""); p != "" {
-		return p
-	}
-	cfg, err := config.Load()
-	if err != nil {
-		return "default"
-	}
-	if cfg.ActiveProfile != "" {
-		return cfg.ActiveProfile
-	}
-	return "default"
-}
 

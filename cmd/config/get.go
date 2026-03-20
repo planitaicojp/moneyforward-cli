@@ -26,12 +26,12 @@ Valid keys:
 func runGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
+	profile := getProfile(cmd)
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
-
-	profile := getActiveProfile(cfg)
 
 	switch key {
 	case "active_profile":

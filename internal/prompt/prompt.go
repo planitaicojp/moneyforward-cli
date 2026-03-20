@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 // Confirm asks a yes/no question. Default is No.
@@ -39,37 +40,13 @@ func Input(message, defaultVal string) (string, error) {
 	return line, nil
 }
 
-// Password asks for a secret input with echo disabled (best-effort via stty).
+// Password asks for a secret input with echo disabled.
 func Password(message string) (string, error) {
 	fmt.Fprintf(os.Stderr, "%s: ", message)
-
-	// Disable terminal echo if possible.
-	echoDisabled := disableEcho()
-	if echoDisabled {
-		defer func() {
-			enableEcho()
-			fmt.Fprintln(os.Stderr) // print newline after hidden input
-		}()
-	}
-
-	reader := bufio.NewReader(os.Stdin)
-	line, err := reader.ReadString('\n')
+	b, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimRight(line, "\r\n"), nil
-}
-
-// disableEcho turns off terminal echo using stty. Returns true on success.
-func disableEcho() bool {
-	cmd := exec.Command("stty", "-echo")
-	cmd.Stdin = os.Stdin
-	return cmd.Run() == nil
-}
-
-// enableEcho turns on terminal echo using stty.
-func enableEcho() {
-	cmd := exec.Command("stty", "echo")
-	cmd.Stdin = os.Stdin
-	_ = cmd.Run()
+	fmt.Fprintln(os.Stderr) // newline after hidden input
+	return string(b), nil
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/planitaicojp/moneyforward-cli/cmd/cmdutil"
 	"github.com/planitaicojp/moneyforward-cli/internal/api"
 	"github.com/planitaicojp/moneyforward-cli/internal/config"
 	cerrors "github.com/planitaicojp/moneyforward-cli/internal/errors"
@@ -36,7 +37,7 @@ func runToken(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	profile := getProfile(cmd)
+	profile := cmdutil.GetProfile(cmd)
 
 	svc, ok := api.Services[tokenService]
 	if !ok {

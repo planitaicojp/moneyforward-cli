@@ -11,8 +11,10 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -86,17 +88,33 @@ func generateState() (string, error) {
 }
 
 // openBrowser attempts to open the given URL in the default browser.
-func openBrowser(rawURL string) {
+// Returns an error if the browser cannot be launched; callers should warn and show the URL instead.
+func openBrowser(rawURL string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
 		cmd = exec.Command("open", rawURL)
 	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", rawURL)
+		cmd = exec.Command("cmd", "/c", "start", rawURL)
+	case "linux":
+		if isWSL() {
+			cmd = exec.Command("cmd.exe", "/c", "start", rawURL)
+		} else {
+			cmd = exec.Command("xdg-open", rawURL)
+		}
 	default:
 		cmd = exec.Command("xdg-open", rawURL)
 	}
-	_ = cmd.Start()
+	return cmd.Start()
+}
+
+// isWSL reports whether the process is running inside Windows Subsystem for Linux.
+func isWSL() bool {
+	data, err := os.ReadFile("/proc/version")
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(string(data)), "microsoft")
 }
 
 // AuthorizeOptions holds options for the authorization flow.
@@ -144,7 +162,9 @@ func Authorize(svc ServiceConfig, opts AuthorizeOptions) (*TokenResponse, error)
 	if opts.PrintURL != nil {
 		opts.PrintURL(authURL)
 	}
-	openBrowser(authURL)
+	if err := openBrowser(authURL); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to open browser: %v\n", err)
+	}
 
 	// Wait for callback.
 	type callbackResult struct {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/planitaicojp/moneyforward-cli/cmd/cmdutil"
 	"github.com/planitaicojp/moneyforward-cli/internal/api"
 	"github.com/planitaicojp/moneyforward-cli/internal/config"
 )
@@ -21,7 +22,7 @@ var statusCmd = &cobra.Command{
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	profile := getProfile(cmd)
+	profile := cmdutil.GetProfile(cmd)
 
 	tokens, err := config.LoadTokens()
 	if err != nil {

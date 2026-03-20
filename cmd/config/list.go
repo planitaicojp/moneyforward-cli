@@ -19,12 +19,12 @@ var listCmd = &cobra.Command{
 }
 
 func runList(cmd *cobra.Command, args []string) error {
+	profile := getProfile(cmd)
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
-
-	profile := getActiveProfile(cfg)
 
 	// Build key-value pairs.
 	kvs := map[string]string{
