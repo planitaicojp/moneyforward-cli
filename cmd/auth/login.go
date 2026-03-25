@@ -51,13 +51,15 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		return &cerrors.ValidationError{Field: "service", Message: fmt.Sprintf("unknown service %q, valid values: %s", loginService, strings.Join(names, ", "))}
 	}
 
+	// Load config (used for client ID resolution and saving).
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
 	// Resolve client ID.
 	clientID := loginClientID
 	if clientID == "" {
-		cfg, err := config.Load()
-		if err != nil {
-			return err
-		}
 		if p, ok := cfg.Profiles[profile]; ok {
 			clientID = p.ClientID
 		}
@@ -113,10 +115,6 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	}
 
 	// Save client_id to config if not already there.
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
 	if cfg.Profiles == nil {
 		cfg.Profiles = make(map[string]config.Profile)
 	}

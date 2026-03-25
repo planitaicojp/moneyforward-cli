@@ -9,6 +9,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	cerrors "github.com/planitaicojp/moneyforward-cli/internal/errors"
 )
 
 const defaultTimeout = 30 * time.Second
@@ -160,7 +162,11 @@ func (c *Client) DoJSON(method, url string, body interface{}, target interface{}
 		if msg == "" {
 			msg = string(respBytes)
 		}
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, msg)
+		return &cerrors.APIError{
+			StatusCode: resp.StatusCode,
+			Code:       apiErr.Code,
+			Message:    msg,
+		}
 	}
 
 	if target != nil && len(respBytes) > 0 {

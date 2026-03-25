@@ -59,24 +59,6 @@ func Execute() {
 	}
 }
 
-// GetProfile returns the active profile name.
-func GetProfile() string {
-	if flagProfile != "" {
-		return flagProfile
-	}
-	if p := config.EnvOr(config.EnvProfile, ""); p != "" {
-		return p
-	}
-	cfg, err := config.Load()
-	if err != nil {
-		return "default"
-	}
-	if cfg.ActiveProfile != "" {
-		return cfg.ActiveProfile
-	}
-	return "default"
-}
-
 // GetFormat returns the output format.
 func GetFormat() string {
 	if flagFormat != "" {

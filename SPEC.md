@@ -70,9 +70,9 @@ GET {AuthURL}
 **PKCE 生成規則** *(確定, RFC 7636)*:
 
 ```
-code_verifier  : crypto/rand で 32バイト生成 → base64url (no padding)
-                 結果は 43文字 (32バイト → base64url = ceil(32*4/3))
-                 ※ RFC は 43-128文字を許容するが、32バイト固定で十分
+code_verifier  : crypto/rand を使って 43文字のランダム文字列を生成 (RFC 7636 の unreserved characters)
+                 使用文字: A-Z a-z 0-9 -._~
+                 ※ RFC は 43-128文字を許容するが、43文字固定で実装
 code_challenge : SHA256(code_verifier バイト列) → base64url (no padding)
                  S256 なので常に 43文字
 ```
@@ -1157,33 +1157,33 @@ type Device struct {
 }
 
 type DevicePreset struct {
-    AssetNumber         string `json:"asset_number"`
+    AssetNumber         string `json:"assetNumber"`
     Subtype             string `json:"subtype"`
-    ModelName           string `json:"model_name"`
-    SerialNumber        string `json:"serial_number,omitempty"`
-    ModelNumber         string `json:"model_number,omitempty"`
+    ModelName           string `json:"modelName"`
+    SerialNumber        string `json:"serialNumber,omitempty"`
+    ModelNumber         string `json:"modelNumber,omitempty"`
     Memory              string `json:"memory,omitempty"`
-    HDDSSD              string `json:"hdd_ssd,omitempty"`
+    HDDSSD              string `json:"hddSsd,omitempty"`
     CPU                 string `json:"cpu,omitempty"`
     OS                  string `json:"os,omitempty"`
     Size                string `json:"size,omitempty"`
     Manufacturer        string `json:"manufacturer,omitempty"`
     Supplier            string `json:"supplier,omitempty"`
-    ProcurementMethod   string `json:"procurement_method,omitempty"`
-    PurchaseDate        string `json:"purchase_date,omitempty"`
-    PurchaseCost        string `json:"purchase_cost,omitempty"`
-    WarrantyPeriod      string `json:"warranty_period,omitempty"`
-    DecommissionDate    string `json:"decommission_date,omitempty"`
-    ScheduledReturnDate string `json:"scheduled_return_date,omitempty"`
-    FixedAsset          string `json:"fixed_asset,omitempty"`
-    PhoneNumber         string `json:"phone_number,omitempty"`
-    SIMNumber           string `json:"sim_number,omitempty"`
-    MobilePlan          string `json:"mobile_plan,omitempty"`
+    ProcurementMethod   string `json:"procurementMethod,omitempty"`
+    PurchaseDate        string `json:"purchaseDate,omitempty"`
+    PurchaseCost        string `json:"purchaseCost,omitempty"`
+    WarrantyPeriod      string `json:"warrantyPeriod,omitempty"`
+    DecommissionDate    string `json:"decommissionDate,omitempty"`
+    ScheduledReturnDate string `json:"scheduledReturnDate,omitempty"`
+    FixedAsset          string `json:"fixedAsset,omitempty"`
+    PhoneNumber         string `json:"phoneNumber,omitempty"`
+    SIMNumber           string `json:"simNumber,omitempty"`
+    MobilePlan          string `json:"mobilePlan,omitempty"`
     Hostname            string `json:"hostname,omitempty"`
     Version             string `json:"version,omitempty"`
-    KeyboardLayout      string `json:"keyboard_layout,omitempty"`
-    UsageStartDate      string `json:"usage_start_date,omitempty"`
-    UsageEndDate        string `json:"usage_end_date,omitempty"`
+    KeyboardLayout      string `json:"keyboardLayout,omitempty"`
+    UsageStartDate      string `json:"usageStartDate,omitempty"`
+    UsageEndDate        string `json:"usageEndDate,omitempty"`
 }
 ```
 
@@ -1276,7 +1276,9 @@ const (
     DeviceTypePhone DeviceType = "phone"
     DeviceTypeOther DeviceType = "other"
 )
+```
 
+```go
 type DeviceSubtype string
 
 const (

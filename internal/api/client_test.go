@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/planitaicojp/moneyforward-cli/internal/api"
+	cerrors "github.com/planitaicojp/moneyforward-cli/internal/errors"
 )
 
 // ── Headers ───────────────────────────────────────────────────────────────────
@@ -209,6 +211,14 @@ func TestClient_DoJSON_HTTPError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("error = %q, want to contain 'not found'", err.Error())
+	}
+	// Verify structured error type.
+	var apiErr *cerrors.APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatal("expected *cerrors.APIError")
+	}
+	if apiErr.StatusCode != http.StatusNotFound {
+		t.Errorf("StatusCode = %d, want 404", apiErr.StatusCode)
 	}
 }
 

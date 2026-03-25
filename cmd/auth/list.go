@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/planitaicojp/moneyforward-cli/cmd/cmdutil"
 	"github.com/planitaicojp/moneyforward-cli/internal/config"
 )
 
@@ -47,10 +48,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "PROFILE\tACTIVE\tSERVICES")
 
-	activeProfile := cfg.ActiveProfile
-	if activeProfile == "" {
-		activeProfile = "default"
-	}
+	activeProfile := cmdutil.GetProfile(cmd)
 
 	for _, name := range names {
 		active := ""
