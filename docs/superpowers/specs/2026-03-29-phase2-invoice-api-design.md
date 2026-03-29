@@ -31,7 +31,7 @@ type InvoiceService struct {
     base   string // "https://invoice.moneyforward.com/api/v3"
 }
 
-func NewInvoiceService(token, version string, verbose bool) *InvoiceService
+func NewInvoiceService(client *Client) *InvoiceService
 ```
 
 Each resource gets typed methods:
@@ -55,9 +55,10 @@ Wrapping varies by endpoint (critical to get right):
 | POST | `/partners`, `/items` | Direct (no wrapping) |
 | PATCH | `/partners/{id}`, `/items/{id}` | Direct (no wrapping) |
 | POST | `/invoice_template_billings` | Direct (Invoice Act endpoint) |
+| POST | `/billings` | **PROHIBITED** (legacy, do NOT use) |
 | PATCH | `/billings/{id}` | `{"billing": {...}}` |
 | POST | `/quotes` | Direct |
-| PATCH | `/quotes/{id}` | `{"quote": {...}}` |
+| PATCH | `/quotes/{id}` | Direct (ref impl sends without wrapping; SPEC.md marks as "to be confirmed" — verify at implementation time) |
 | POST | `/quotes/{id}/convert_to_billing` | Empty `{}` |
 
 ### Pagination
@@ -82,7 +83,7 @@ func (p Params) QueryString() string // "page=1&per_page=25"
 ```
 
 - `--page` (default: 1), `--per-page` (default: 25, max: 100)
-- `--all` auto-pagination deferred to PR 2b
+- `--all` auto-pagination: fetches all pages sequentially with `time.Sleep(400ms)` between requests (3 req/sec rate limit)
 
 ## File Structure
 
@@ -150,7 +151,95 @@ type PartnerDepartment struct {
 }
 ```
 
-Full struct definitions for Item, Billing, Quote follow the same pattern per SPEC.md Section 2.4.
+```go
+type Item struct {
+    ID                     string `json:"id"`
+    Name                   string `json:"name"`
+    Code                   string `json:"code,omitempty"`
+    Detail                 string `json:"detail,omitempty"`
+    Unit                   string `json:"unit,omitempty"`
+    Price                  *int   `json:"price,omitempty"`
+    Quantity               *int   `json:"quantity,omitempty"`
+    IsDeductWithholdingTax *bool  `json:"is_deduct_withholding_tax,omitempty"`
+    Excise                 string `json:"excise,omitempty"`
+    CreatedAt              string `json:"created_at"`
+    UpdatedAt              string `json:"updated_at"`
+}
+
+type Billing struct {
+    ID               string        `json:"id"`
+    PDFURL           string        `json:"pdf_url,omitempty"`
+    OperatorID       string        `json:"operator_id,omitempty"`
+    DepartmentID     string        `json:"department_id,omitempty"`
+    PartnerID        string        `json:"partner_id,omitempty"`
+    PartnerName      string        `json:"partner_name,omitempty"`
+    PartnerDetail    string        `json:"partner_detail,omitempty"`
+    MemberID         string        `json:"member_id,omitempty"`
+    MemberName       string        `json:"member_name,omitempty"`
+    Title            string        `json:"title,omitempty"`
+    Memo             string        `json:"memo,omitempty"`
+    PaymentCondition string        `json:"payment_condition,omitempty"`
+    BillingNumber    string        `json:"billing_number,omitempty"`
+    BillingDate      string        `json:"billing_date,omitempty"`
+    DueDate          string        `json:"due_date,omitempty"`
+    SalesDate        string        `json:"sales_date,omitempty"`
+    PaymentStatus    PaymentStatus `json:"payment_status"`
+    Subtotal         *int          `json:"subtotal,omitempty"`
+    TotalPrice       *int          `json:"total_price,omitempty"`
+    Tax              *int          `json:"tax,omitempty"`
+    Items            []BillingItem `json:"items"`
+    CreatedAt        string        `json:"created_at"`
+    UpdatedAt        string        `json:"updated_at"`
+}
+
+type BillingItem struct {
+    ID                     string `json:"id,omitempty"`
+    Name                   string `json:"name"`
+    Code                   string `json:"code,omitempty"`
+    Detail                 string `json:"detail,omitempty"`
+    Unit                   string `json:"unit,omitempty"`
+    Price                  int    `json:"price"`
+    Quantity               int    `json:"quantity"`
+    IsDeductWithholdingTax *bool  `json:"is_deduct_withholding_tax,omitempty"`
+    Excise                 string `json:"excise,omitempty"`
+}
+
+type Quote struct {
+    ID            string      `json:"id"`
+    PDFURL        string      `json:"pdf_url,omitempty"`
+    OperatorID    string      `json:"operator_id,omitempty"`
+    DepartmentID  string      `json:"department_id,omitempty"`
+    PartnerID     string      `json:"partner_id,omitempty"`
+    PartnerName   string      `json:"partner_name,omitempty"`
+    PartnerDetail string      `json:"partner_detail,omitempty"`
+    Title         string      `json:"title,omitempty"`
+    Memo          string      `json:"memo,omitempty"`
+    QuoteNumber   string      `json:"quote_number,omitempty"`
+    QuoteDate     string      `json:"quote_date,omitempty"`
+    ExpiredDate   string      `json:"expired_date,omitempty"`
+    Status        QuoteStatus `json:"status"`
+    Subtotal      *int        `json:"subtotal,omitempty"`
+    TotalPrice    *int        `json:"total_price,omitempty"`
+    Tax           *int        `json:"tax,omitempty"`
+    Items         []QuoteItem `json:"items"`
+    CreatedAt     string      `json:"created_at"`
+    UpdatedAt     string      `json:"updated_at"`
+}
+
+type QuoteItem struct {
+    ID                     string `json:"id,omitempty"`
+    Name                   string `json:"name"`
+    Code                   string `json:"code,omitempty"`
+    Detail                 string `json:"detail,omitempty"`
+    Unit                   string `json:"unit,omitempty"`
+    Price                  int    `json:"price"`
+    Quantity               int    `json:"quantity"`
+    IsDeductWithholdingTax *bool  `json:"is_deduct_withholding_tax,omitempty"`
+    Excise                 string `json:"excise,omitempty"`
+}
+```
+
+Additional structs for Billing/Quote creation follow SPEC.md Section 2.4.
 
 ### Request structs (write)
 
@@ -213,7 +302,7 @@ const (
 ```bash
 mf invoice office show
 
-mf invoice partners list [--page N] [--per-page N] [--query <q>]
+mf invoice partners list [--page N] [--per-page N] [--query <q>] [--all]
 mf invoice partners show <id>
 mf invoice partners create --name <name> [--name-kana <kana>] [--code <code>] [--memo <text>]
 mf invoice partners update <id> [--name <name>] [--code <code>] [--memo <text>]
@@ -227,26 +316,30 @@ mf invoice partners departments list <partner-id>
 ```bash
 mf invoice items list [--page N] [--per-page N] [--query <q>] [--all]
 mf invoice items show <id>
-mf invoice items create --name <name> [--code <code>] [--price <n>] [--quantity <n>] [--excise <type>]
-mf invoice items update <id> [--name <name>] [--code <code>] [--price <n>]
+mf invoice items create --name <name> [--code <code>] [--detail <text>] [--unit <unit>] [--price <n>] [--quantity <n>] [--excise <type>]
+mf invoice items update <id> [--name <name>] [--code <code>] [--detail <text>] [--unit <unit>] [--price <n>] [--quantity <n>] [--excise <type>]
 mf invoice items delete <id> [--yes]
 
-mf invoice billings list [--page N] [--per-page N] [--partner-id <id>] [--payment-status <s>] [--from <date>] [--to <date>] [--query <q>] [--all]
+mf invoice billings list [--page N] [--per-page N] [--partner-id <id>] [--partner <name>] [--payment-status <s>] [--from <date>] [--to <date>] [--query <q>] [--all]
 mf invoice billings show <id>
-mf invoice billings create --partner-id <id> --billing-date <YYYY-MM-DD> [--item "..." ...] [--items-file <path>] [--department-id <id>] [--dry-run]
-mf invoice billings update <id> [--title <text>] [--memo <text>] [--items-file <path>] [--dry-run]
+mf invoice billings create --partner-id <id> --billing-date <YYYY-MM-DD> [--item "..." ...] [--items-file <path>] [--items-stdin] [--department-id <id>] [--dry-run]
+mf invoice billings update <id> [--title <text>] [--memo <text>] [--items-file <path>] [--items-stdin] [--dry-run]
 mf invoice billings delete <id> [--yes]
 mf invoice billings set-payment-status <id> --status <unsettled|settled>
 mf invoice billings pdf <id> [--download] [--output <path>]
 ```
 
+`billings set-payment-status` uses `PATCH /billings/{id}` with body `{"billing": {"payment_status": "<status>"}}`.
+
+`--partner <name>` resolves name to partner_id via `GET /partners?q=<name>` — errors if zero or multiple matches.
+
 ### PR 2c Commands (9 commands)
 
 ```bash
-mf invoice quotes list [--page N] [--per-page N] [--partner-id <id>] [--status <s>] [--from <date>] [--to <date>] [--query <q>] [--all]
+mf invoice quotes list [--page N] [--per-page N] [--partner-id <id>] [--partner <name>] [--status <s>] [--from <date>] [--to <date>] [--query <q>] [--all]
 mf invoice quotes show <id>
-mf invoice quotes create --partner-id <id> --quote-date <date> --expired-date <date> [--item "..." ...] [--items-file <path>] [--dry-run]
-mf invoice quotes update <id> [--title <text>] [--memo <text>] [--items-file <path>] [--dry-run]
+mf invoice quotes create --partner-id <id> --quote-date <date> --expired-date <date> [--item "..." ...] [--items-file <path>] [--items-stdin] [--dry-run]
+mf invoice quotes update <id> [--title <text>] [--memo <text>] [--items-file <path>] [--items-stdin] [--dry-run]
 mf invoice quotes delete <id> [--yes]
 mf invoice quotes set-status <id> --status <draft|sent|accepted|rejected|cancelled>
 mf invoice quotes to-billing <id>
@@ -255,13 +348,15 @@ mf invoice quotes pdf <id> [--download] [--output <path>]
 mf invoice sent-histories list [--page N] [--per-page N] [--all]
 ```
 
+`quotes set-status` uses `PATCH /quotes/{id}` with the status field (wrapping to be confirmed at implementation time).
+
 ## Command Behavior Details
 
 ### Output Integration
 
 - All list/show commands respect `--format` global flag (table/json/yaml/csv)
 - Table mode: tabwriter with header row, pagination info in footer
-- JSON mode: raw API response (preserves envelope with pagination)
+- JSON mode: raw API response envelope `{"data": [...], "pagination": {"total_count": N, "total_pages": N, "current_page": N, "per_page": N}}`
 - Delete commands output nothing on success (exit 0), error on failure
 
 ### Authentication Flow
@@ -305,6 +400,16 @@ Excise short aliases (ADR-011):
 
 JSON or YAML file containing line items array. Detected by file extension.
 
+### `--items-stdin` Input
+
+Read line items from stdin as JSON. Enables agent-friendly piping:
+
+```bash
+echo '[{"name":"Consulting","price":100000,"quantity":1,"excise":"ten_percent"}]' | mf invoice billings create --partner-id X --billing-date 2026-04-01 --items-stdin
+```
+
+Priority when multiple input methods are specified: `--items-stdin` > `--items-file` > `--item` flags.
+
 ### `--dry-run`
 
 Prints the request body to stdout without making the API call. Useful for Agent workflows that want to inspect before committing.
@@ -334,7 +439,8 @@ When creating billings/quotes without `--department-id`:
 
 ## Non-Goals for Phase 2
 
-- Rate limiter (3 req/sec) — rely on existing 429 retry logic in Phase 1 client
+- Dedicated rate limiter (3 req/sec) — rely on existing 429 retry logic in Phase 1 client; `--all` uses `time.Sleep(400ms)` between pages
 - Webhook support
 - Batch operations
 - Accounting API integration (closed API)
+- Delivery slip (納品書) creation — v3 API does not provide this endpoint
