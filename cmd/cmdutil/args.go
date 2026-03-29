@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/planitaicojp/moneyforward-cli/internal/config"
 )
 
 // ExactArgs returns a PositionalArgs that reports the command's Use line on mismatch.
@@ -14,4 +16,26 @@ func ExactArgs(n int) cobra.PositionalArgs {
 		}
 		return nil
 	}
+}
+
+// GetProfile resolves the active profile from (in order of precedence):
+//  1. --profile flag on the root command
+//  2. MF_PROFILE environment variable
+//  3. active_profile in config.yaml
+//  4. "default"
+func GetProfile(cmd *cobra.Command) string {
+	if f := cmd.Root().PersistentFlags().Lookup("profile"); f != nil && f.Value.String() != "" {
+		return f.Value.String()
+	}
+	if p := config.EnvOr(config.EnvProfile, ""); p != "" {
+		return p
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return "default"
+	}
+	if cfg.ActiveProfile != "" {
+		return cfg.ActiveProfile
+	}
+	return "default"
 }

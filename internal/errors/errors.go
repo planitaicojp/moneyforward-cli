@@ -1,6 +1,9 @@
 package errors
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 const (
 	ExitOK         = 0
@@ -117,7 +120,8 @@ func GetExitCode(err error) int {
 	if err == nil {
 		return ExitOK
 	}
-	if ec, ok := err.(ExitCoder); ok {
+	var ec ExitCoder
+	if errors.As(err, &ec) {
 		return ec.ExitCode()
 	}
 	return ExitGeneral

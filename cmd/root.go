@@ -6,6 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/planitaicojp/moneyforward-cli/cmd/auth"
+	cmdconfig "github.com/planitaicojp/moneyforward-cli/cmd/config"
 	"github.com/planitaicojp/moneyforward-cli/internal/config"
 	cerrors "github.com/planitaicojp/moneyforward-cli/internal/errors"
 )
@@ -45,6 +47,8 @@ func init() {
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(auth.AuthCmd)
+	rootCmd.AddCommand(cmdconfig.ConfigCmd)
 }
 
 // Execute runs the root command.
@@ -53,24 +57,6 @@ func Execute() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(cerrors.GetExitCode(err))
 	}
-}
-
-// GetProfile returns the active profile name.
-func GetProfile() string {
-	if flagProfile != "" {
-		return flagProfile
-	}
-	if p := config.EnvOr(config.EnvProfile, ""); p != "" {
-		return p
-	}
-	cfg, err := config.Load()
-	if err != nil {
-		return "default"
-	}
-	if cfg.ActiveProfile != "" {
-		return cfg.ActiveProfile
-	}
-	return "default"
 }
 
 // GetFormat returns the output format.
