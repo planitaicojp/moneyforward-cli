@@ -53,20 +53,20 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		backoff = time.Second
 	)
 
+	// Capture the request body once before the loop so retries can replay it.
+	var bodyBytes []byte
+	if req.Body != nil {
+		bodyBytes, err = io.ReadAll(req.Body)
+		if err != nil {
+			return nil, fmt.Errorf("reading request body: %w", err)
+		}
+		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	}
+
 	for attempt := 0; attempt < maxTry; attempt++ {
 		if attempt > 0 {
 			time.Sleep(backoff)
 			backoff *= 2
-		}
-
-		// Clone the request body for retry if needed.
-		var bodyBytes []byte
-		if req.Body != nil {
-			bodyBytes, err = io.ReadAll(req.Body)
-			if err != nil {
-				return nil, fmt.Errorf("reading request body: %w", err)
-			}
-			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 		}
 
 		if c.verbose {
