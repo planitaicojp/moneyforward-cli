@@ -47,8 +47,7 @@ var partnersCmd = &cobra.Command{
 var (
 	partnersListPage    int
 	partnersListPerPage int
-	partnersListQuery   string
-	partnersListAll     bool
+	partnersListQuery string
 )
 
 var partnersListCmd = &cobra.Command{
@@ -114,7 +113,6 @@ func init() {
 	partnersListCmd.Flags().IntVar(&partnersListPage, "page", 1, "page number")
 	partnersListCmd.Flags().IntVar(&partnersListPerPage, "per-page", 25, "items per page (max 100)")
 	partnersListCmd.Flags().StringVar(&partnersListQuery, "query", "", "search query")
-	partnersListCmd.Flags().BoolVar(&partnersListAll, "all", false, "fetch all pages")
 
 	partnersCreateCmd.Flags().StringVar(&partnersCreateName, "name", "", "partner name (required)")
 	partnersCreateCmd.Flags().StringVar(&partnersCreateNameKana, "name-kana", "", "partner name in kana")

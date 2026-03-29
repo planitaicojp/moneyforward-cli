@@ -80,17 +80,9 @@ func (s *InvoiceService) UpdatePartner(id string, params model.UpdatePartnerPara
 }
 
 func (s *InvoiceService) DeletePartner(id string) error {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/partners/%s", s.base, id), nil)
-	if err != nil {
-		return fmt.Errorf("creating delete request: %w", err)
-	}
-	resp, err := s.client.Do(req)
+	err := s.client.DoJSON(http.MethodDelete, fmt.Sprintf("%s/partners/%s", s.base, id), nil, nil)
 	if err != nil {
 		return fmt.Errorf("deleting partner: %w", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("deleting partner: HTTP %d", resp.StatusCode)
 	}
 	return nil
 }
