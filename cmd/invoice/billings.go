@@ -414,6 +414,9 @@ func runBillingsPDF(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if pdfURL == "" {
+		return fmt.Errorf("billing %s has no PDF URL available", args[0])
+	}
 
 	if !billingsPDFDownload && billingsPDFOutput == "" {
 		fmt.Println(pdfURL)
@@ -426,6 +429,10 @@ func runBillingsPDF(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("downloading PDF: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("downloading PDF: unexpected status %d", resp.StatusCode)
+	}
 
 	outPath := billingsPDFOutput
 	if outPath == "" {
