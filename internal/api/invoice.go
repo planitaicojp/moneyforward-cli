@@ -25,15 +25,16 @@ func NewInvoiceServiceDefault(client *Client) *InvoiceService {
 	return NewInvoiceService(client, invoiceBaseURL)
 }
 
-// buildListQuery builds a URL query string with pagination and optional search query.
-func buildListQuery(params pagination.Params, query string) string {
+// buildListQuery builds url.Values with pagination and optional search query.
+// Callers can add more params before calling Encode().
+func buildListQuery(params pagination.Params, query string) url.Values {
 	v := make(url.Values)
 	v.Set("page", strconv.Itoa(params.Page))
 	v.Set("per_page", strconv.Itoa(params.PerPage))
 	if query != "" {
 		v.Set("q", query)
 	}
-	return v.Encode()
+	return v
 }
 
 // listResponse is a generic wrapper for paginated API responses.
@@ -57,7 +58,7 @@ func (s *InvoiceService) GetOffice() (*model.Office, error) {
 }
 
 func (s *InvoiceService) ListPartners(params pagination.Params, query string) ([]model.Partner, *pagination.Result, error) {
-	u := s.base + "/partners?" + buildListQuery(params, query)
+	u := s.base + "/partners?" + buildListQuery(params, query).Encode()
 	var resp listResponse[model.Partner]
 	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
 		return nil, nil, fmt.Errorf("listing partners: %w", err)
@@ -112,7 +113,7 @@ func (s *InvoiceService) ListPartnerDepartments(partnerID string) ([]model.Partn
 // --- Items ---
 
 func (s *InvoiceService) ListItems(params pagination.Params, query string) ([]model.Item, *pagination.Result, error) {
-	u := s.base + "/items?" + buildListQuery(params, query)
+	u := s.base + "/items?" + buildListQuery(params, query).Encode()
 	var resp listResponse[model.Item]
 	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
 		return nil, nil, fmt.Errorf("listing items: %w", err)
@@ -168,9 +169,7 @@ type BillingListOptions struct {
 }
 
 func (o BillingListOptions) queryString() string {
-	v := make(url.Values)
-	v.Set("page", strconv.Itoa(o.Page))
-	v.Set("per_page", strconv.Itoa(o.PerPage))
+	v := buildListQuery(o.Params, o.Query)
 	if o.PartnerID != "" {
 		v.Set("partner_id", o.PartnerID)
 	}
@@ -182,9 +181,6 @@ func (o BillingListOptions) queryString() string {
 	}
 	if o.To != "" {
 		v.Set("to", o.To)
-	}
-	if o.Query != "" {
-		v.Set("q", o.Query)
 	}
 	return v.Encode()
 }
