@@ -153,14 +153,14 @@ type BillingItem struct {
 
 // InvoiceTemplateLine is a line item for billing/quote creation (Invoice Act compliant).
 type InvoiceTemplateLine struct {
-	Name                   string `json:"name"`
-	Code                   string `json:"code,omitempty"`
-	Detail                 string `json:"detail,omitempty"`
-	Unit                   string `json:"unit,omitempty"`
-	Price                  int    `json:"price"`
-	Quantity               int    `json:"quantity"`
-	IsDeductWithholdingTax *bool  `json:"is_deduct_withholding_tax,omitempty"`
-	Excise                 string `json:"excise"`
+	Name                   string `json:"name" yaml:"name"`
+	Code                   string `json:"code,omitempty" yaml:"code,omitempty"`
+	Detail                 string `json:"detail,omitempty" yaml:"detail,omitempty"`
+	Unit                   string `json:"unit,omitempty" yaml:"unit,omitempty"`
+	Price                  int    `json:"price" yaml:"price"`
+	Quantity               int    `json:"quantity" yaml:"quantity"`
+	IsDeductWithholdingTax *bool  `json:"is_deduct_withholding_tax,omitempty" yaml:"is_deduct_withholding_tax,omitempty"`
+	Excise                 string `json:"excise" yaml:"excise"`
 }
 
 // CreateBillingParams is sent to POST /invoice_template_billings (Invoice Act).

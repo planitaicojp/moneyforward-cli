@@ -257,11 +257,13 @@ func (s *InvoiceService) GetBillingPDF(id string) (string, error) {
 	return billing.PDFURL, nil
 }
 
-// DownloadPDF fetches the PDF at the given URL using the authenticated client.
+// DownloadPDF fetches the PDF at the given URL.
+// Uses a plain HTTP client (no auth) since PDF URLs are typically signed/external.
 func (s *InvoiceService) DownloadPDF(pdfURL string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodGet, pdfURL, nil)
+	httpClient := &http.Client{Timeout: s.client.http.Timeout}
+	resp, err := httpClient.Get(pdfURL)
 	if err != nil {
-		return nil, fmt.Errorf("creating PDF request: %w", err)
+		return nil, fmt.Errorf("downloading PDF: %w", err)
 	}
-	return s.client.Do(req)
+	return resp, nil
 }

@@ -95,6 +95,28 @@ func TestParseItemsYAML(t *testing.T) {
 	}
 }
 
+func TestParseItemsYAML_WithholdingTax(t *testing.T) {
+	yamlStr := `- name: Tax Item
+  price: 500
+  quantity: 1
+  excise: ten_percent
+  is_deduct_withholding_tax: true
+`
+	items, err := parseItemsYAML(strings.NewReader(yamlStr))
+	if err != nil {
+		t.Fatalf("parseItemsYAML: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("len = %d, want 1", len(items))
+	}
+	if items[0].IsDeductWithholdingTax == nil {
+		t.Fatal("IsDeductWithholdingTax is nil, want non-nil")
+	}
+	if !*items[0].IsDeductWithholdingTax {
+		t.Errorf("IsDeductWithholdingTax = false, want true")
+	}
+}
+
 func TestParseItemsFromFile_JSON(t *testing.T) {
 	f := t.TempDir() + "/items.json"
 	os.WriteFile(f, []byte(`[{"name":"X","price":1,"quantity":1,"excise":"ten_percent"}]`), 0644)

@@ -775,6 +775,61 @@ func TestInvoiceService_UpdateBilling(t *testing.T) {
 	}
 }
 
+func TestInvoiceService_UpdateBilling_WithItems(t *testing.T) {
+	newTitle := "With Items"
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		// Verify wrapping includes items
+		var rawBody map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&rawBody); err != nil {
+			t.Fatalf("decoding body: %v", err)
+		}
+		inner, ok := rawBody["billing"]
+		if !ok {
+			t.Fatal("expected body to have 'billing' key")
+		}
+		var parsed struct {
+			Title *string                  `json:"title"`
+			Items []model.InvoiceTemplateLine `json:"items"`
+		}
+		if err := json.Unmarshal(inner, &parsed); err != nil {
+			t.Fatalf("unmarshaling billing inner: %v", err)
+		}
+		if parsed.Title == nil || *parsed.Title != "With Items" {
+			t.Errorf("Title = %v, want %q", parsed.Title, "With Items")
+		}
+		if len(parsed.Items) != 1 {
+			t.Fatalf("Items len = %d, want 1", len(parsed.Items))
+		}
+		if parsed.Items[0].Name != "Line 1" {
+			t.Errorf("Items[0].Name = %q, want %q", parsed.Items[0].Name, "Line 1")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(model.Billing{
+			ID:            "b1",
+			Title:         *parsed.Title,
+			PaymentStatus: model.PaymentStatusUnsettled,
+			CreatedAt:     "2024-01-01",
+			UpdatedAt:     "2024-06-01",
+		})
+	})
+
+	params := model.UpdateBillingParams{
+		Title: &newTitle,
+		Items: []model.InvoiceTemplateLine{
+			{Name: "Line 1", Price: 1000, Quantity: 1, Excise: "ten_percent"},
+		},
+	}
+	billing, err := svc.UpdateBilling("b1", params)
+	if err != nil {
+		t.Fatalf("UpdateBilling() with items error: %v", err)
+	}
+	if billing.Title != "With Items" {
+		t.Errorf("billing.Title = %q, want %q", billing.Title, "With Items")
+	}
+}
+
 func TestInvoiceService_DeleteBilling(t *testing.T) {
 	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v3/billings/b1" {
