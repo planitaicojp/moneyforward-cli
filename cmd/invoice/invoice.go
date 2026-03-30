@@ -14,4 +14,6 @@ func init() {
 	partnersCmd.AddCommand(partnersDepartmentsCmd)
 	InvoiceCmd.AddCommand(itemsCmd)
 	InvoiceCmd.AddCommand(billingsCmd)
+	InvoiceCmd.AddCommand(quotesCmd)
+	InvoiceCmd.AddCommand(sentHistoriesCmd)
 }
