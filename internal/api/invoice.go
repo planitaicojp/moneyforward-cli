@@ -43,10 +43,13 @@ func (s *InvoiceService) GetOffice() (*model.Office, error) {
 	return &office, nil
 }
 
-func (s *InvoiceService) ListPartners(params pagination.Params) ([]model.Partner, *pagination.Result, error) {
-	url := fmt.Sprintf("%s/partners?%s", s.base, params.QueryString())
+func (s *InvoiceService) ListPartners(params pagination.Params, query string) ([]model.Partner, *pagination.Result, error) {
+	u := fmt.Sprintf("%s/partners?%s", s.base, params.QueryString())
+	if query != "" {
+		u += "&q=" + query
+	}
 	var resp listResponse[model.Partner]
-	if err := s.client.DoJSON(http.MethodGet, url, nil, &resp); err != nil {
+	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
 		return nil, nil, fmt.Errorf("listing partners: %w", err)
 	}
 	return resp.Data, &resp.Pagination, nil

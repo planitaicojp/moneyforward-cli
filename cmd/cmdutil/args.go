@@ -39,3 +39,25 @@ func GetProfile(cmd *cobra.Command) string {
 	}
 	return "default"
 }
+
+// GetFormat resolves the output format from (in order of precedence):
+//  1. --format flag on the root command
+//  2. MF_FORMAT environment variable
+//  3. defaults.format in config.yaml
+//  4. "table"
+func GetFormat(cmd *cobra.Command) string {
+	if f := cmd.Root().PersistentFlags().Lookup("format"); f != nil && f.Value.String() != "" {
+		return f.Value.String()
+	}
+	if f := config.EnvOr(config.EnvFormat, ""); f != "" {
+		return f
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return config.DefaultFormat
+	}
+	if cfg.Defaults.Format != "" {
+		return cfg.Defaults.Format
+	}
+	return config.DefaultFormat
+}

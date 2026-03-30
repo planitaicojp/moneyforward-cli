@@ -22,22 +22,6 @@ func TestParams_QueryString_CustomValues(t *testing.T) {
 	}
 }
 
-func TestParams_QueryString_WithQuery(t *testing.T) {
-	p := pagination.Params{Page: 1, PerPage: 25, Query: "test corp"}
-	got := p.QueryString()
-	if got != "page=1&per_page=25&q=test+corp" {
-		t.Errorf("QueryString() = %q, want %q", got, "page=1&per_page=25&q=test+corp")
-	}
-}
-
-func TestParams_QueryString_EmptyQuery(t *testing.T) {
-	p := pagination.Params{Page: 1, PerPage: 25, Query: ""}
-	got := p.QueryString()
-	if got != "page=1&per_page=25" {
-		t.Errorf("QueryString() = %q, want %q", got, "page=1&per_page=25")
-	}
-}
-
 func TestDefaultParams(t *testing.T) {
 	p := pagination.DefaultParams()
 	if p.Page != 1 {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/planitaicojp/moneyforward-cli/cmd/cmdutil"
 	"github.com/planitaicojp/moneyforward-cli/internal/output"
 )
 
@@ -34,6 +35,6 @@ func runOfficeShow(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	f := output.New(getFormat(cmd))
+	f := output.New(cmdutil.GetFormat(cmd))
 	return f.Format(os.Stdout, office)
 }

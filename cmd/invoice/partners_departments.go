@@ -36,7 +36,7 @@ func runPartnersDepartmentsList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	format := getFormat(cmd)
+	format := cmdutil.GetFormat(cmd)
 	f := output.New(format)
 
 	if format == "json" {

@@ -8,7 +8,6 @@ import (
 type Params struct {
 	Page    int
 	PerPage int
-	Query   string
 }
 
 func DefaultParams() Params {
@@ -19,9 +18,6 @@ func (p Params) QueryString() string {
 	v := url.Values{}
 	v.Set("page", fmt.Sprintf("%d", p.Page))
 	v.Set("per_page", fmt.Sprintf("%d", p.PerPage))
-	if p.Query != "" {
-		v.Set("q", p.Query)
-	}
 	return v.Encode()
 }
 

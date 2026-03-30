@@ -23,16 +23,12 @@ func newInvoiceService(cmd *cobra.Command) (*api.InvoiceService, error) {
 		return nil, err
 	}
 	verbose, _ := cmd.Root().PersistentFlags().GetBool("verbose")
-	client := api.NewWithToken(token, "dev", verbose)
-	return api.NewInvoiceServiceDefault(client), nil
-}
-
-func getFormat(cmd *cobra.Command) string {
-	format, _ := cmd.Root().PersistentFlags().GetString("format")
-	if format == "" {
-		format = "table"
+	version := cmd.Root().Version
+	if version == "" {
+		version = "dev"
 	}
-	return format
+	client := api.NewWithToken(token, version, verbose)
+	return api.NewInvoiceServiceDefault(client), nil
 }
 
 // --- partners root ---
@@ -145,15 +141,14 @@ func runPartnersList(cmd *cobra.Command, args []string) error {
 	params := pagination.Params{
 		Page:    partnersListPage,
 		PerPage: partnersListPerPage,
-		Query:   partnersListQuery,
 	}
 
-	partners, pg, err := svc.ListPartners(params)
+	partners, pg, err := svc.ListPartners(params, partnersListQuery)
 	if err != nil {
 		return err
 	}
 
-	format := getFormat(cmd)
+	format := cmdutil.GetFormat(cmd)
 	f := output.New(format)
 
 	if format == "json" {
@@ -173,7 +168,7 @@ func runPartnersShow(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	f := output.New(getFormat(cmd))
+	f := output.New(cmdutil.GetFormat(cmd))
 	return f.Format(os.Stdout, partner)
 }
 
@@ -196,7 +191,7 @@ func runPartnersCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	f := output.New(getFormat(cmd))
+	f := output.New(cmdutil.GetFormat(cmd))
 	return f.Format(os.Stdout, partner)
 }
 
@@ -228,7 +223,7 @@ func runPartnersUpdate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	f := output.New(getFormat(cmd))
+	f := output.New(cmdutil.GetFormat(cmd))
 	return f.Format(os.Stdout, partner)
 }
 

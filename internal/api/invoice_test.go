@@ -87,7 +87,7 @@ func TestInvoiceService_ListPartners(t *testing.T) {
 	})
 
 	params := pagination.Params{Page: 2, PerPage: 10}
-	partners, pag, err := svc.ListPartners(params)
+	partners, pag, err := svc.ListPartners(params, "")
 	if err != nil {
 		t.Fatalf("ListPartners() error: %v", err)
 	}
@@ -134,8 +134,8 @@ func TestInvoiceService_ListPartners_WithQuery(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(resp)
 	})
 
-	params := pagination.Params{Page: 1, PerPage: 25, Query: "acme"}
-	partners, _, err := svc.ListPartners(params)
+	params := pagination.Params{Page: 1, PerPage: 25}
+	partners, _, err := svc.ListPartners(params, "acme")
 	if err != nil {
 		t.Fatalf("ListPartners() with query error: %v", err)
 	}
