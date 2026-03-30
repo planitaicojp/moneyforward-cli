@@ -263,3 +263,120 @@ func (s *InvoiceService) DownloadPDF(pdfURL string) (*http.Response, error) {
 	}
 	return resp, nil
 }
+
+// --- Quotes ---
+
+// QuoteListOptions holds filter parameters for listing quotes.
+type QuoteListOptions struct {
+	pagination.Params
+	PartnerID string
+	Status    string
+	From      string
+	To        string
+	Query     string
+}
+
+func (o QuoteListOptions) queryString() string {
+	v := buildListQuery(o.Params, o.Query)
+	if o.PartnerID != "" {
+		v.Set("partner_id", o.PartnerID)
+	}
+	if o.Status != "" {
+		v.Set("status", o.Status)
+	}
+	if o.From != "" {
+		v.Set("from", o.From)
+	}
+	if o.To != "" {
+		v.Set("to", o.To)
+	}
+	return v.Encode()
+}
+
+func (s *InvoiceService) ListQuotes(opts QuoteListOptions) ([]model.Quote, *pagination.Result, error) {
+	u := fmt.Sprintf("%s/quotes?%s", s.base, opts.queryString())
+	var resp listResponse[model.Quote]
+	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
+		return nil, nil, fmt.Errorf("listing quotes: %w", err)
+	}
+	return resp.Data, &resp.Pagination, nil
+}
+
+func (s *InvoiceService) GetQuote(id string) (*model.Quote, error) {
+	var quote model.Quote
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/quotes/%s", s.base, id), nil, &quote)
+	if err != nil {
+		return nil, fmt.Errorf("getting quote: %w", err)
+	}
+	return &quote, nil
+}
+
+// CreateQuote uses POST /quotes (direct, no wrapping).
+func (s *InvoiceService) CreateQuote(params model.CreateQuoteParams) (*model.Quote, error) {
+	var quote model.Quote
+	err := s.client.DoJSON(http.MethodPost, s.base+"/quotes", params, &quote)
+	if err != nil {
+		return nil, fmt.Errorf("creating quote: %w", err)
+	}
+	return &quote, nil
+}
+
+// UpdateQuote uses PATCH /quotes/{id} (direct, no wrapping — unlike billings).
+func (s *InvoiceService) UpdateQuote(id string, params model.UpdateQuoteParams) (*model.Quote, error) {
+	var quote model.Quote
+	err := s.client.DoJSON(http.MethodPatch, fmt.Sprintf("%s/quotes/%s", s.base, id), params, &quote)
+	if err != nil {
+		return nil, fmt.Errorf("updating quote: %w", err)
+	}
+	return &quote, nil
+}
+
+func (s *InvoiceService) DeleteQuote(id string) error {
+	err := s.client.DoJSON(http.MethodDelete, fmt.Sprintf("%s/quotes/%s", s.base, id), nil, nil)
+	if err != nil {
+		return fmt.Errorf("deleting quote: %w", err)
+	}
+	return nil
+}
+
+// SetQuoteStatus updates quote status via PATCH /quotes/{id} (direct, no wrapping).
+func (s *InvoiceService) SetQuoteStatus(id string, status model.QuoteStatus) (*model.Quote, error) {
+	body := map[string]any{"status": status}
+	var quote model.Quote
+	err := s.client.DoJSON(http.MethodPatch, fmt.Sprintf("%s/quotes/%s", s.base, id), body, &quote)
+	if err != nil {
+		return nil, fmt.Errorf("setting quote status: %w", err)
+	}
+	return &quote, nil
+}
+
+// ConvertQuoteToBilling converts a quote to a billing via POST /quotes/{id}/convert_to_billing.
+// Sends empty {} body.
+func (s *InvoiceService) ConvertQuoteToBilling(id string) (*model.Billing, error) {
+	var billing model.Billing
+	err := s.client.DoJSON(http.MethodPost, fmt.Sprintf("%s/quotes/%s/convert_to_billing", s.base, id), map[string]any{}, &billing)
+	if err != nil {
+		return nil, fmt.Errorf("converting quote to billing: %w", err)
+	}
+	return &billing, nil
+}
+
+// GetQuotePDF returns the PDF URL for a quote.
+func (s *InvoiceService) GetQuotePDF(id string) (string, error) {
+	quote, err := s.GetQuote(id)
+	if err != nil {
+		return "", err
+	}
+	return quote.PDFURL, nil
+}
+
+// --- Sent Histories ---
+
+func (s *InvoiceService) ListSentHistories(params pagination.Params) ([]model.SentHistory, *pagination.Result, error) {
+	u := s.base + "/sent_histories?" + buildListQuery(params, "").Encode()
+	var resp listResponse[model.SentHistory]
+	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
+		return nil, nil, fmt.Errorf("listing sent histories: %w", err)
+	}
+	return resp.Data, &resp.Pagination, nil
+}
