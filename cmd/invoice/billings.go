@@ -142,9 +142,9 @@ func init() {
 	billingsListCmd.Flags().StringVar(&billingsListQuery, "query", "", "search query")
 	billingsListCmd.Flags().BoolVar(&billingsListAll, "all", false, "fetch all pages")
 
-	billingsCreateCmd.Flags().StringVar(&billingsCreatePartnerID, "partner-id", "", "partner ID (required)")
+	billingsCreateCmd.Flags().StringVar(&billingsCreatePartnerID, "partner-id", "", "partner ID (required if --department-id is omitted)")
 	billingsCreateCmd.Flags().StringVar(&billingsCreateBillingDate, "billing-date", "", "billing date YYYY-MM-DD (required)")
-	billingsCreateCmd.Flags().StringVar(&billingsCreateDepartment, "department-id", "", "department ID (auto-resolved if omitted)")
+	billingsCreateCmd.Flags().StringVar(&billingsCreateDepartment, "department-id", "", "department ID (auto-resolved from --partner-id if omitted)")
 	billingsCreateCmd.Flags().StringVar(&billingsCreateTitle, "title", "", "billing title")
 	billingsCreateCmd.Flags().StringVar(&billingsCreateMemo, "memo", "", "memo")
 	billingsCreateCmd.Flags().StringVar(&billingsCreatePaymentCond, "payment-condition", "", "payment condition")
@@ -154,7 +154,6 @@ func init() {
 	billingsCreateCmd.Flags().StringVar(&billingsCreateItemsFile, "items-file", "", "JSON or YAML file with line items")
 	billingsCreateCmd.Flags().BoolVar(&billingsCreateItemsStdin, "items-stdin", false, "read line items from stdin as JSON")
 	billingsCreateCmd.Flags().BoolVar(&billingsCreateDryRun, "dry-run", false, "print request body without sending")
-	_ = billingsCreateCmd.MarkFlagRequired("partner-id")
 	_ = billingsCreateCmd.MarkFlagRequired("billing-date")
 
 	billingsUpdateCmd.Flags().StringVar(&billingsUpdateTitle, "title", "", "billing title")
@@ -289,6 +288,9 @@ func runBillingsCreate(cmd *cobra.Command, args []string) error {
 	// Auto-resolve department_id if not provided.
 	departmentID := billingsCreateDepartment
 	if departmentID == "" {
+		if billingsCreatePartnerID == "" {
+			return fmt.Errorf("either --department-id or --partner-id must be provided")
+		}
 		depts, err := svc.ListPartnerDepartments(billingsCreatePartnerID)
 		if err != nil {
 			return fmt.Errorf("resolving department: %w", err)
