@@ -98,3 +98,52 @@ func (s *InvoiceService) ListPartnerDepartments(partnerID string) ([]model.Partn
 	}
 	return resp.Data, nil
 }
+
+// --- Items ---
+
+func (s *InvoiceService) ListItems(params pagination.Params, query string) ([]model.Item, *pagination.Result, error) {
+	u := fmt.Sprintf("%s/items?%s", s.base, params.QueryString())
+	if query != "" {
+		u += "&q=" + query
+	}
+	var resp listResponse[model.Item]
+	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
+		return nil, nil, fmt.Errorf("listing items: %w", err)
+	}
+	return resp.Data, &resp.Pagination, nil
+}
+
+func (s *InvoiceService) GetItem(id string) (*model.Item, error) {
+	var item model.Item
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/items/%s", s.base, id), nil, &item)
+	if err != nil {
+		return nil, fmt.Errorf("getting item: %w", err)
+	}
+	return &item, nil
+}
+
+func (s *InvoiceService) CreateItem(params model.CreateItemParams) (*model.Item, error) {
+	var item model.Item
+	err := s.client.DoJSON(http.MethodPost, s.base+"/items", params, &item)
+	if err != nil {
+		return nil, fmt.Errorf("creating item: %w", err)
+	}
+	return &item, nil
+}
+
+func (s *InvoiceService) UpdateItem(id string, params model.UpdateItemParams) (*model.Item, error) {
+	var item model.Item
+	err := s.client.DoJSON(http.MethodPatch, fmt.Sprintf("%s/items/%s", s.base, id), params, &item)
+	if err != nil {
+		return nil, fmt.Errorf("updating item: %w", err)
+	}
+	return &item, nil
+}
+
+func (s *InvoiceService) DeleteItem(id string) error {
+	err := s.client.DoJSON(http.MethodDelete, fmt.Sprintf("%s/items/%s", s.base, id), nil, nil)
+	if err != nil {
+		return fmt.Errorf("deleting item: %w", err)
+	}
+	return nil
+}
