@@ -566,3 +566,312 @@ func TestInvoiceService_DeleteItem(t *testing.T) {
 		t.Fatalf("DeleteItem() error: %v", err)
 	}
 }
+
+func TestInvoiceService_ListBillings(t *testing.T) {
+	subtotal, total := 1000, 1100
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/billings" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		q := r.URL.Query()
+		if q.Get("page") != "1" {
+			t.Errorf("page = %q, want %q", q.Get("page"), "1")
+		}
+		if q.Get("per_page") != "25" {
+			t.Errorf("per_page = %q, want %q", q.Get("per_page"), "25")
+		}
+		if q.Get("partner_id") != "p1" {
+			t.Errorf("partner_id = %q, want %q", q.Get("partner_id"), "p1")
+		}
+		if q.Get("payment_status") != "unsettled" {
+			t.Errorf("payment_status = %q, want %q", q.Get("payment_status"), "unsettled")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		resp := map[string]interface{}{
+			"data": []model.Billing{
+				{ID: "b1", Title: "Billing 1", PaymentStatus: model.PaymentStatusUnsettled, Subtotal: &subtotal, TotalPrice: &total, CreatedAt: "2024-01-01", UpdatedAt: "2024-01-01"},
+			},
+			"pagination": map[string]int{
+				"total_count":  1,
+				"total_pages":  1,
+				"current_page": 1,
+				"per_page":     25,
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	opts := api.BillingListOptions{
+		Params:        pagination.Params{Page: 1, PerPage: 25},
+		PartnerID:     "p1",
+		PaymentStatus: "unsettled",
+	}
+	billings, pag, err := svc.ListBillings(opts)
+	if err != nil {
+		t.Fatalf("ListBillings() error: %v", err)
+	}
+	if len(billings) != 1 {
+		t.Errorf("len(billings) = %d, want 1", len(billings))
+	}
+	if billings[0].ID != "b1" {
+		t.Errorf("billings[0].ID = %q, want %q", billings[0].ID, "b1")
+	}
+	if billings[0].PaymentStatus != model.PaymentStatusUnsettled {
+		t.Errorf("billings[0].PaymentStatus = %q, want %q", billings[0].PaymentStatus, model.PaymentStatusUnsettled)
+	}
+	if pag.TotalCount != 1 {
+		t.Errorf("pag.TotalCount = %d, want 1", pag.TotalCount)
+	}
+}
+
+func TestInvoiceService_GetBilling(t *testing.T) {
+	subtotal, total := 2000, 2200
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/billings/b1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(model.Billing{
+			ID:            "b1",
+			Title:         "Test Billing",
+			PaymentStatus: model.PaymentStatusUnsettled,
+			PDFURL:        "https://example.com/b1.pdf",
+			Subtotal:      &subtotal,
+			TotalPrice:    &total,
+			CreatedAt:     "2024-01-01",
+			UpdatedAt:     "2024-01-01",
+		})
+	})
+
+	billing, err := svc.GetBilling("b1")
+	if err != nil {
+		t.Fatalf("GetBilling() error: %v", err)
+	}
+	if billing.ID != "b1" {
+		t.Errorf("billing.ID = %q, want %q", billing.ID, "b1")
+	}
+	if billing.Title != "Test Billing" {
+		t.Errorf("billing.Title = %q, want %q", billing.Title, "Test Billing")
+	}
+	if billing.PDFURL != "https://example.com/b1.pdf" {
+		t.Errorf("billing.PDFURL = %q, want %q", billing.PDFURL, "https://example.com/b1.pdf")
+	}
+}
+
+func TestInvoiceService_CreateBilling(t *testing.T) {
+	subtotal, total := 5000, 5500
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		// Critical: must POST to /invoice_template_billings, NOT /billings
+		if r.URL.Path != "/api/v3/invoice_template_billings" {
+			t.Errorf("unexpected path: %s (want /api/v3/invoice_template_billings)", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		if ct := r.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
+			t.Errorf("Content-Type = %q, want application/json", ct)
+		}
+
+		// Critical: body must be direct (not wrapped in {"billing": ...})
+		var body model.CreateBillingParams
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding body: %v", err)
+		}
+		if body.DepartmentID != "dept1" {
+			t.Errorf("body.DepartmentID = %q, want %q", body.DepartmentID, "dept1")
+		}
+		if body.BillingDate != "2024-06-01" {
+			t.Errorf("body.BillingDate = %q, want %q", body.BillingDate, "2024-06-01")
+		}
+		if body.Title != "Test Invoice" {
+			t.Errorf("body.Title = %q, want %q", body.Title, "Test Invoice")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(model.Billing{
+			ID:            "b-new",
+			Title:         body.Title,
+			PaymentStatus: model.PaymentStatusUnsettled,
+			Subtotal:      &subtotal,
+			TotalPrice:    &total,
+			CreatedAt:     "2024-06-01",
+			UpdatedAt:     "2024-06-01",
+		})
+	})
+
+	params := model.CreateBillingParams{
+		DepartmentID: "dept1",
+		BillingDate:  "2024-06-01",
+		Title:        "Test Invoice",
+	}
+	billing, err := svc.CreateBilling(params)
+	if err != nil {
+		t.Fatalf("CreateBilling() error: %v", err)
+	}
+	if billing.ID != "b-new" {
+		t.Errorf("billing.ID = %q, want %q", billing.ID, "b-new")
+	}
+	if billing.Title != "Test Invoice" {
+		t.Errorf("billing.Title = %q, want %q", billing.Title, "Test Invoice")
+	}
+}
+
+func TestInvoiceService_UpdateBilling(t *testing.T) {
+	newTitle := "Updated Billing"
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/billings/b1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPatch {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+
+		// Critical: body must be wrapped as {"billing": {...}}
+		var rawBody map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&rawBody); err != nil {
+			t.Errorf("decoding body: %v", err)
+		}
+		inner, ok := rawBody["billing"]
+		if !ok {
+			t.Errorf("expected body to have 'billing' key, got: %v", rawBody)
+		}
+		var params model.UpdateBillingParams
+		if err := json.Unmarshal(inner, &params); err != nil {
+			t.Errorf("unmarshaling billing inner: %v", err)
+		}
+		if params.Title == nil || *params.Title != "Updated Billing" {
+			t.Errorf("params.Title = %v, want pointer to %q", params.Title, "Updated Billing")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(model.Billing{
+			ID:            "b1",
+			Title:         *params.Title,
+			PaymentStatus: model.PaymentStatusUnsettled,
+			CreatedAt:     "2024-01-01",
+			UpdatedAt:     "2024-06-01",
+		})
+	})
+
+	params := model.UpdateBillingParams{Title: &newTitle}
+	billing, err := svc.UpdateBilling("b1", params)
+	if err != nil {
+		t.Fatalf("UpdateBilling() error: %v", err)
+	}
+	if billing.Title != "Updated Billing" {
+		t.Errorf("billing.Title = %q, want %q", billing.Title, "Updated Billing")
+	}
+}
+
+func TestInvoiceService_DeleteBilling(t *testing.T) {
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/billings/b1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodDelete {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := svc.DeleteBilling("b1")
+	if err != nil {
+		t.Fatalf("DeleteBilling() error: %v", err)
+	}
+}
+
+func TestInvoiceService_SetPaymentStatus(t *testing.T) {
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/billings/b1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPatch {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+
+		// Critical: body must be wrapped as {"billing": {"payment_status": "settled"}}
+		var rawBody map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&rawBody); err != nil {
+			t.Errorf("decoding body: %v", err)
+		}
+		inner, ok := rawBody["billing"]
+		if !ok {
+			t.Errorf("expected body to have 'billing' key, got: %v", rawBody)
+		}
+		var innerMap map[string]json.RawMessage
+		if err := json.Unmarshal(inner, &innerMap); err != nil {
+			t.Errorf("unmarshaling billing inner: %v", err)
+		}
+		statusRaw, ok := innerMap["payment_status"]
+		if !ok {
+			t.Errorf("expected inner to have 'payment_status' key")
+		}
+		var status string
+		if err := json.Unmarshal(statusRaw, &status); err != nil {
+			t.Errorf("unmarshaling payment_status: %v", err)
+		}
+		if status != "settled" {
+			t.Errorf("payment_status = %q, want %q", status, "settled")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(model.Billing{
+			ID:            "b1",
+			Title:         "Some Billing",
+			PaymentStatus: model.PaymentStatusSettled,
+			CreatedAt:     "2024-01-01",
+			UpdatedAt:     "2024-06-01",
+		})
+	})
+
+	billing, err := svc.SetPaymentStatus("b1", model.PaymentStatusSettled)
+	if err != nil {
+		t.Fatalf("SetPaymentStatus() error: %v", err)
+	}
+	if billing.PaymentStatus != model.PaymentStatusSettled {
+		t.Errorf("billing.PaymentStatus = %q, want %q", billing.PaymentStatus, model.PaymentStatusSettled)
+	}
+}
+
+func TestInvoiceService_GetBillingPDF(t *testing.T) {
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/billings/b1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(model.Billing{
+			ID:            "b1",
+			Title:         "PDF Billing",
+			PaymentStatus: model.PaymentStatusUnsettled,
+			PDFURL:        "https://example.com/invoice/b1.pdf",
+			CreatedAt:     "2024-01-01",
+			UpdatedAt:     "2024-01-01",
+		})
+	})
+
+	pdfURL, err := svc.GetBillingPDF("b1")
+	if err != nil {
+		t.Fatalf("GetBillingPDF() error: %v", err)
+	}
+	if pdfURL != "https://example.com/invoice/b1.pdf" {
+		t.Errorf("pdfURL = %q, want %q", pdfURL, "https://example.com/invoice/b1.pdf")
+	}
+}
