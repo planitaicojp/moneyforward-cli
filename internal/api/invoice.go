@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/planitaicojp/moneyforward-cli/internal/model"
 	"github.com/planitaicojp/moneyforward-cli/internal/pagination"
@@ -46,7 +47,7 @@ func (s *InvoiceService) GetOffice() (*model.Office, error) {
 func (s *InvoiceService) ListPartners(params pagination.Params, query string) ([]model.Partner, *pagination.Result, error) {
 	u := fmt.Sprintf("%s/partners?%s", s.base, params.QueryString())
 	if query != "" {
-		u += "&q=" + query
+		u += "&q=" + url.QueryEscape(query)
 	}
 	var resp listResponse[model.Partner]
 	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
@@ -97,4 +98,162 @@ func (s *InvoiceService) ListPartnerDepartments(partnerID string) ([]model.Partn
 		return nil, fmt.Errorf("listing partner departments: %w", err)
 	}
 	return resp.Data, nil
+}
+
+// --- Items ---
+
+func (s *InvoiceService) ListItems(params pagination.Params, query string) ([]model.Item, *pagination.Result, error) {
+	u := fmt.Sprintf("%s/items?%s", s.base, params.QueryString())
+	if query != "" {
+		u += "&q=" + url.QueryEscape(query)
+	}
+	var resp listResponse[model.Item]
+	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
+		return nil, nil, fmt.Errorf("listing items: %w", err)
+	}
+	return resp.Data, &resp.Pagination, nil
+}
+
+func (s *InvoiceService) GetItem(id string) (*model.Item, error) {
+	var item model.Item
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/items/%s", s.base, id), nil, &item)
+	if err != nil {
+		return nil, fmt.Errorf("getting item: %w", err)
+	}
+	return &item, nil
+}
+
+func (s *InvoiceService) CreateItem(params model.CreateItemParams) (*model.Item, error) {
+	var item model.Item
+	err := s.client.DoJSON(http.MethodPost, s.base+"/items", params, &item)
+	if err != nil {
+		return nil, fmt.Errorf("creating item: %w", err)
+	}
+	return &item, nil
+}
+
+func (s *InvoiceService) UpdateItem(id string, params model.UpdateItemParams) (*model.Item, error) {
+	var item model.Item
+	err := s.client.DoJSON(http.MethodPatch, fmt.Sprintf("%s/items/%s", s.base, id), params, &item)
+	if err != nil {
+		return nil, fmt.Errorf("updating item: %w", err)
+	}
+	return &item, nil
+}
+
+func (s *InvoiceService) DeleteItem(id string) error {
+	err := s.client.DoJSON(http.MethodDelete, fmt.Sprintf("%s/items/%s", s.base, id), nil, nil)
+	if err != nil {
+		return fmt.Errorf("deleting item: %w", err)
+	}
+	return nil
+}
+
+// --- Billings ---
+
+// BillingListOptions holds filter parameters for listing billings.
+type BillingListOptions struct {
+	pagination.Params
+	PartnerID     string
+	PaymentStatus string
+	From          string
+	To            string
+	Query         string
+}
+
+func (o BillingListOptions) queryString() string {
+	qs := o.Params.QueryString()
+	if o.PartnerID != "" {
+		qs += "&partner_id=" + url.QueryEscape(o.PartnerID)
+	}
+	if o.PaymentStatus != "" {
+		qs += "&payment_status=" + url.QueryEscape(o.PaymentStatus)
+	}
+	if o.From != "" {
+		qs += "&from=" + url.QueryEscape(o.From)
+	}
+	if o.To != "" {
+		qs += "&to=" + url.QueryEscape(o.To)
+	}
+	if o.Query != "" {
+		qs += "&q=" + url.QueryEscape(o.Query)
+	}
+	return qs
+}
+
+func (s *InvoiceService) ListBillings(opts BillingListOptions) ([]model.Billing, *pagination.Result, error) {
+	u := fmt.Sprintf("%s/billings?%s", s.base, opts.queryString())
+	var resp listResponse[model.Billing]
+	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
+		return nil, nil, fmt.Errorf("listing billings: %w", err)
+	}
+	return resp.Data, &resp.Pagination, nil
+}
+
+func (s *InvoiceService) GetBilling(id string) (*model.Billing, error) {
+	var billing model.Billing
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/billings/%s", s.base, id), nil, &billing)
+	if err != nil {
+		return nil, fmt.Errorf("getting billing: %w", err)
+	}
+	return &billing, nil
+}
+
+// CreateBilling uses POST /invoice_template_billings (Invoice Act compliant).
+// Body is sent directly (no wrapping).
+func (s *InvoiceService) CreateBilling(params model.CreateBillingParams) (*model.Billing, error) {
+	var billing model.Billing
+	err := s.client.DoJSON(http.MethodPost, s.base+"/invoice_template_billings", params, &billing)
+	if err != nil {
+		return nil, fmt.Errorf("creating billing: %w", err)
+	}
+	return &billing, nil
+}
+
+// UpdateBilling uses PATCH /billings/{id} with body wrapped as {"billing": {...}}.
+func (s *InvoiceService) UpdateBilling(id string, params model.UpdateBillingParams) (*model.Billing, error) {
+	wrapped := map[string]any{"billing": params}
+	var billing model.Billing
+	err := s.client.DoJSON(http.MethodPatch, fmt.Sprintf("%s/billings/%s", s.base, id), wrapped, &billing)
+	if err != nil {
+		return nil, fmt.Errorf("updating billing: %w", err)
+	}
+	return &billing, nil
+}
+
+func (s *InvoiceService) DeleteBilling(id string) error {
+	err := s.client.DoJSON(http.MethodDelete, fmt.Sprintf("%s/billings/%s", s.base, id), nil, nil)
+	if err != nil {
+		return fmt.Errorf("deleting billing: %w", err)
+	}
+	return nil
+}
+
+// SetPaymentStatus uses PATCH /billings/{id} with {"billing": {"payment_status": status}}.
+func (s *InvoiceService) SetPaymentStatus(id string, status model.PaymentStatus) (*model.Billing, error) {
+	wrapped := map[string]any{"billing": map[string]any{"payment_status": status}}
+	var billing model.Billing
+	err := s.client.DoJSON(http.MethodPatch, fmt.Sprintf("%s/billings/%s", s.base, id), wrapped, &billing)
+	if err != nil {
+		return nil, fmt.Errorf("setting payment status: %w", err)
+	}
+	return &billing, nil
+}
+
+// GetBillingPDF returns the PDF URL for a billing.
+func (s *InvoiceService) GetBillingPDF(id string) (string, error) {
+	billing, err := s.GetBilling(id)
+	if err != nil {
+		return "", err
+	}
+	return billing.PDFURL, nil
+}
+
+// DownloadPDF fetches the PDF at the given URL using the authenticated client.
+func (s *InvoiceService) DownloadPDF(pdfURL string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, pdfURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating PDF request: %w", err)
+	}
+	return s.client.Do(req)
 }
