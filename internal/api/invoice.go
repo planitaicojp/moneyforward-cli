@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/planitaicojp/moneyforward-cli/internal/model"
 	"github.com/planitaicojp/moneyforward-cli/internal/pagination"
@@ -22,6 +23,18 @@ func NewInvoiceService(client *Client, base string) *InvoiceService {
 
 func NewInvoiceServiceDefault(client *Client) *InvoiceService {
 	return NewInvoiceService(client, invoiceBaseURL)
+}
+
+// buildListQuery builds url.Values with pagination and optional search query.
+// Callers can add more params before calling Encode().
+func buildListQuery(params pagination.Params, query string) url.Values {
+	v := make(url.Values)
+	v.Set("page", strconv.Itoa(params.Page))
+	v.Set("per_page", strconv.Itoa(params.PerPage))
+	if query != "" {
+		v.Set("q", query)
+	}
+	return v
 }
 
 // listResponse is a generic wrapper for paginated API responses.
@@ -45,10 +58,7 @@ func (s *InvoiceService) GetOffice() (*model.Office, error) {
 }
 
 func (s *InvoiceService) ListPartners(params pagination.Params, query string) ([]model.Partner, *pagination.Result, error) {
-	u := fmt.Sprintf("%s/partners?%s", s.base, params.QueryString())
-	if query != "" {
-		u += "&q=" + url.QueryEscape(query)
-	}
+	u := s.base + "/partners?" + buildListQuery(params, query).Encode()
 	var resp listResponse[model.Partner]
 	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
 		return nil, nil, fmt.Errorf("listing partners: %w", err)
@@ -103,10 +113,7 @@ func (s *InvoiceService) ListPartnerDepartments(partnerID string) ([]model.Partn
 // --- Items ---
 
 func (s *InvoiceService) ListItems(params pagination.Params, query string) ([]model.Item, *pagination.Result, error) {
-	u := fmt.Sprintf("%s/items?%s", s.base, params.QueryString())
-	if query != "" {
-		u += "&q=" + url.QueryEscape(query)
-	}
+	u := s.base + "/items?" + buildListQuery(params, query).Encode()
 	var resp listResponse[model.Item]
 	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
 		return nil, nil, fmt.Errorf("listing items: %w", err)
@@ -162,23 +169,20 @@ type BillingListOptions struct {
 }
 
 func (o BillingListOptions) queryString() string {
-	qs := o.Params.QueryString()
+	v := buildListQuery(o.Params, o.Query)
 	if o.PartnerID != "" {
-		qs += "&partner_id=" + url.QueryEscape(o.PartnerID)
+		v.Set("partner_id", o.PartnerID)
 	}
 	if o.PaymentStatus != "" {
-		qs += "&payment_status=" + url.QueryEscape(o.PaymentStatus)
+		v.Set("payment_status", o.PaymentStatus)
 	}
 	if o.From != "" {
-		qs += "&from=" + url.QueryEscape(o.From)
+		v.Set("from", o.From)
 	}
 	if o.To != "" {
-		qs += "&to=" + url.QueryEscape(o.To)
+		v.Set("to", o.To)
 	}
-	if o.Query != "" {
-		qs += "&q=" + url.QueryEscape(o.Query)
-	}
-	return qs
+	return v.Encode()
 }
 
 func (s *InvoiceService) ListBillings(opts BillingListOptions) ([]model.Billing, *pagination.Result, error) {
@@ -249,11 +253,13 @@ func (s *InvoiceService) GetBillingPDF(id string) (string, error) {
 	return billing.PDFURL, nil
 }
 
-// DownloadPDF fetches the PDF at the given URL using the authenticated client.
+// DownloadPDF fetches the PDF at the given URL.
+// Uses a plain HTTP client (no auth) since PDF URLs are typically signed/external.
 func (s *InvoiceService) DownloadPDF(pdfURL string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodGet, pdfURL, nil)
+	httpClient := &http.Client{Timeout: s.client.http.Timeout}
+	resp, err := httpClient.Get(pdfURL)
 	if err != nil {
-		return nil, fmt.Errorf("creating PDF request: %w", err)
+		return nil, fmt.Errorf("downloading PDF: %w", err)
 	}
-	return s.client.Do(req)
+	return resp, nil
 }
