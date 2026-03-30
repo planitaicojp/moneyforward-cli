@@ -186,7 +186,9 @@ func init() {
 
 // resolvePartnerID resolves --partner name to partner_id via search.
 func resolvePartnerID(svc *api.InvoiceService, name string) (string, error) {
-	partners, _, err := svc.ListPartners(pagination.Params{Page: 1, PerPage: 100}, name)
+	partners, err := fetchAll(func(page int) ([]model.Partner, *pagination.Result, error) {
+		return svc.ListPartners(pagination.Params{Page: page, PerPage: 100}, name)
+	})
 	if err != nil {
 		return "", fmt.Errorf("searching partner %q: %w", name, err)
 	}
@@ -398,7 +400,7 @@ func runBillingsDelete(cmd *cobra.Command, args []string) error {
 
 func runBillingsSetPaymentStatus(cmd *cobra.Command, args []string) error {
 	switch billingsSetStatusValue {
-	case "unsettled", "settled":
+	case string(model.PaymentStatusUnsettled), string(model.PaymentStatusSettled):
 	default:
 		return fmt.Errorf("invalid payment status %q: must be unsettled or settled", billingsSetStatusValue)
 	}
@@ -457,10 +459,16 @@ func runBillingsPDF(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("creating file: %w", err)
 	}
-	defer f.Close()
 
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		return fmt.Errorf("writing PDF: %w", err)
+	_, copyErr := io.Copy(f, resp.Body)
+	closeErr := f.Close()
+
+	if copyErr != nil {
+		_ = os.Remove(outPath)
+		return fmt.Errorf("writing PDF: %w", copyErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("closing PDF file: %w", closeErr)
 	}
 
 	fmt.Fprintf(os.Stderr, "Downloaded to %s\n", outPath)
