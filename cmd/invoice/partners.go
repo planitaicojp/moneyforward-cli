@@ -3,6 +3,7 @@ package invoice
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -43,7 +44,8 @@ var partnersCmd = &cobra.Command{
 var (
 	partnersListPage    int
 	partnersListPerPage int
-	partnersListQuery string
+	partnersListQuery   string
+	partnersListAll     bool
 )
 
 var partnersListCmd = &cobra.Command{
@@ -109,6 +111,7 @@ func init() {
 	partnersListCmd.Flags().IntVar(&partnersListPage, "page", 1, "page number")
 	partnersListCmd.Flags().IntVar(&partnersListPerPage, "per-page", 25, "items per page (max 100)")
 	partnersListCmd.Flags().StringVar(&partnersListQuery, "query", "", "search query")
+	partnersListCmd.Flags().BoolVar(&partnersListAll, "all", false, "fetch all pages")
 
 	partnersCreateCmd.Flags().StringVar(&partnersCreateName, "name", "", "partner name (required)")
 	partnersCreateCmd.Flags().StringVar(&partnersCreateNameKana, "name-kana", "", "partner name in kana")
@@ -138,18 +141,36 @@ func runPartnersList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	params := pagination.Params{
-		Page:    partnersListPage,
-		PerPage: partnersListPerPage,
+	format := cmdutil.GetFormat(cmd)
+	f := output.New(format)
+
+	if partnersListAll {
+		var allPartners []model.Partner
+		page := 1
+		for {
+			params := pagination.Params{Page: page, PerPage: 100}
+			partners, pg, err := svc.ListPartners(params, partnersListQuery)
+			if err != nil {
+				return err
+			}
+			allPartners = append(allPartners, partners...)
+			if page >= pg.TotalPages {
+				break
+			}
+			page++
+			time.Sleep(400 * time.Millisecond)
+		}
+		if format == "json" {
+			return f.Format(os.Stdout, map[string]any{"data": allPartners})
+		}
+		return f.Format(os.Stdout, allPartners)
 	}
 
+	params := pagination.Params{Page: partnersListPage, PerPage: partnersListPerPage}
 	partners, pg, err := svc.ListPartners(params, partnersListQuery)
 	if err != nil {
 		return err
 	}
-
-	format := cmdutil.GetFormat(cmd)
-	f := output.New(format)
 
 	if format == "json" {
 		return f.Format(os.Stdout, map[string]any{"data": partners, "pagination": pg})
