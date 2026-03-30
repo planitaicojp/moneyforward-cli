@@ -3,7 +3,6 @@ package invoice
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -145,20 +144,11 @@ func runPartnersList(cmd *cobra.Command, args []string) error {
 	f := output.New(format)
 
 	if partnersListAll {
-		var allPartners []model.Partner
-		page := 1
-		for {
-			params := pagination.Params{Page: page, PerPage: 100}
-			partners, pg, err := svc.ListPartners(params, partnersListQuery)
-			if err != nil {
-				return err
-			}
-			allPartners = append(allPartners, partners...)
-			if page >= pg.TotalPages {
-				break
-			}
-			page++
-			time.Sleep(400 * time.Millisecond)
+		allPartners, err := fetchAll(func(page int) ([]model.Partner, *pagination.Result, error) {
+			return svc.ListPartners(pagination.Params{Page: page, PerPage: 100}, partnersListQuery)
+		})
+		if err != nil {
+			return err
 		}
 		if format == "json" {
 			return f.Format(os.Stdout, map[string]any{"data": allPartners})

@@ -3,7 +3,6 @@ package invoice
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -133,20 +132,11 @@ func runItemsList(cmd *cobra.Command, args []string) error {
 	f := output.New(format)
 
 	if itemsListAll {
-		var allItems []model.Item
-		page := 1
-		for {
-			params := pagination.Params{Page: page, PerPage: 100}
-			items, pg, err := svc.ListItems(params, itemsListQuery)
-			if err != nil {
-				return err
-			}
-			allItems = append(allItems, items...)
-			if page >= pg.TotalPages {
-				break
-			}
-			page++
-			time.Sleep(400 * time.Millisecond)
+		allItems, err := fetchAll(func(page int) ([]model.Item, *pagination.Result, error) {
+			return svc.ListItems(pagination.Params{Page: page, PerPage: 100}, itemsListQuery)
+		})
+		if err != nil {
+			return err
 		}
 		if format == "json" {
 			return f.Format(os.Stdout, map[string]any{"data": allItems})

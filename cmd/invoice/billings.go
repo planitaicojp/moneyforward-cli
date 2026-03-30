@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -215,9 +214,7 @@ func runBillingsList(cmd *cobra.Command, args []string) error {
 	f := output.New(format)
 
 	if billingsListAll {
-		var allBillings []model.Billing
-		page := 1
-		for {
+		allBillings, err := fetchAll(func(page int) ([]model.Billing, *pagination.Result, error) {
 			opts := api.BillingListOptions{
 				Params:        pagination.Params{Page: page, PerPage: 100},
 				PartnerID:     partnerID,
@@ -226,16 +223,10 @@ func runBillingsList(cmd *cobra.Command, args []string) error {
 				To:            billingsListTo,
 				Query:         billingsListQuery,
 			}
-			billings, pg, err := svc.ListBillings(opts)
-			if err != nil {
-				return err
-			}
-			allBillings = append(allBillings, billings...)
-			if page >= pg.TotalPages {
-				break
-			}
-			page++
-			time.Sleep(400 * time.Millisecond)
+			return svc.ListBillings(opts)
+		})
+		if err != nil {
+			return err
 		}
 		if format == "json" {
 			return f.Format(os.Stdout, map[string]any{"data": allBillings})
@@ -298,6 +289,9 @@ func runBillingsCreate(cmd *cobra.Command, args []string) error {
 		}
 		if len(depts) == 0 {
 			return fmt.Errorf("partner has no departments registered; use --department-id")
+		}
+		if len(depts) > 1 {
+			return fmt.Errorf("multiple departments found for partner; use --department-id to specify one")
 		}
 		departmentID = depts[0].ID
 	}
