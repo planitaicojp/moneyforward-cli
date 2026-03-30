@@ -8,6 +8,7 @@ import (
 
 	"github.com/planitaicojp/moneyforward-cli/cmd/auth"
 	cmdconfig "github.com/planitaicojp/moneyforward-cli/cmd/config"
+	"github.com/planitaicojp/moneyforward-cli/cmd/invoice"
 	"github.com/planitaicojp/moneyforward-cli/internal/config"
 	cerrors "github.com/planitaicojp/moneyforward-cli/internal/errors"
 )
@@ -49,6 +50,7 @@ func init() {
 	rootCmd.AddCommand(completionCmd)
 	rootCmd.AddCommand(auth.AuthCmd)
 	rootCmd.AddCommand(cmdconfig.ConfigCmd)
+	rootCmd.AddCommand(invoice.InvoiceCmd)
 }
 
 // Execute runs the root command.
