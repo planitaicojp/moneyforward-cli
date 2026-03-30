@@ -178,10 +178,11 @@ type CreateBillingParams struct {
 
 // UpdateBillingParams is wrapped as {"billing": {...}} for PATCH /billings/{id}.
 type UpdateBillingParams struct {
-	Title            *string `json:"title,omitempty"`
-	Memo             *string `json:"memo,omitempty"`
-	PaymentCondition *string `json:"payment_condition,omitempty"`
-	BillingDate      *string `json:"billing_date,omitempty"`
-	DueDate          *string `json:"due_date,omitempty"`
-	SalesDate        *string `json:"sales_date,omitempty"`
+	Title            *string               `json:"title,omitempty"`
+	Memo             *string               `json:"memo,omitempty"`
+	PaymentCondition *string               `json:"payment_condition,omitempty"`
+	BillingDate      *string               `json:"billing_date,omitempty"`
+	DueDate          *string               `json:"due_date,omitempty"`
+	SalesDate        *string               `json:"sales_date,omitempty"`
+	Items            []InvoiceTemplateLine  `json:"items,omitempty"`
 }

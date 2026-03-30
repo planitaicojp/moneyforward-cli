@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/planitaicojp/moneyforward-cli/internal/model"
 	"github.com/planitaicojp/moneyforward-cli/internal/pagination"
@@ -46,7 +47,7 @@ func (s *InvoiceService) GetOffice() (*model.Office, error) {
 func (s *InvoiceService) ListPartners(params pagination.Params, query string) ([]model.Partner, *pagination.Result, error) {
 	u := fmt.Sprintf("%s/partners?%s", s.base, params.QueryString())
 	if query != "" {
-		u += "&q=" + query
+		u += "&q=" + url.QueryEscape(query)
 	}
 	var resp listResponse[model.Partner]
 	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
@@ -104,7 +105,7 @@ func (s *InvoiceService) ListPartnerDepartments(partnerID string) ([]model.Partn
 func (s *InvoiceService) ListItems(params pagination.Params, query string) ([]model.Item, *pagination.Result, error) {
 	u := fmt.Sprintf("%s/items?%s", s.base, params.QueryString())
 	if query != "" {
-		u += "&q=" + query
+		u += "&q=" + url.QueryEscape(query)
 	}
 	var resp listResponse[model.Item]
 	if err := s.client.DoJSON(http.MethodGet, u, nil, &resp); err != nil {
@@ -163,19 +164,19 @@ type BillingListOptions struct {
 func (o BillingListOptions) queryString() string {
 	qs := o.Params.QueryString()
 	if o.PartnerID != "" {
-		qs += "&partner_id=" + o.PartnerID
+		qs += "&partner_id=" + url.QueryEscape(o.PartnerID)
 	}
 	if o.PaymentStatus != "" {
-		qs += "&payment_status=" + o.PaymentStatus
+		qs += "&payment_status=" + url.QueryEscape(o.PaymentStatus)
 	}
 	if o.From != "" {
-		qs += "&from=" + o.From
+		qs += "&from=" + url.QueryEscape(o.From)
 	}
 	if o.To != "" {
-		qs += "&to=" + o.To
+		qs += "&to=" + url.QueryEscape(o.To)
 	}
 	if o.Query != "" {
-		qs += "&q=" + o.Query
+		qs += "&q=" + url.QueryEscape(o.Query)
 	}
 	return qs
 }
@@ -246,4 +247,13 @@ func (s *InvoiceService) GetBillingPDF(id string) (string, error) {
 		return "", err
 	}
 	return billing.PDFURL, nil
+}
+
+// DownloadPDF fetches the PDF at the given URL using the authenticated client.
+func (s *InvoiceService) DownloadPDF(pdfURL string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, pdfURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating PDF request: %w", err)
+	}
+	return s.client.Do(req)
 }

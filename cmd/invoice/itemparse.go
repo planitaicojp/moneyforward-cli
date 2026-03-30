@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/planitaicojp/moneyforward-cli/internal/model"
+	"gopkg.in/yaml.v3"
 )
 
 // parseItemFlag parses a single --item flag value like "name=Consulting,price=100000,quantity=1,excise=10".
@@ -53,8 +55,8 @@ func parseItemFlag(s string) (model.InvoiceTemplateLine, error) {
 	return item, nil
 }
 
-// parseItemsFromReader reads JSON array of InvoiceTemplateLine from a reader.
-func parseItemsFromReader(r io.Reader) ([]model.InvoiceTemplateLine, error) {
+// parseItemsJSON reads JSON array of InvoiceTemplateLine from a reader.
+func parseItemsJSON(r io.Reader) ([]model.InvoiceTemplateLine, error) {
 	var items []model.InvoiceTemplateLine
 	if err := json.NewDecoder(r).Decode(&items); err != nil {
 		return nil, fmt.Errorf("parsing items JSON: %w", err)
@@ -62,19 +64,39 @@ func parseItemsFromReader(r io.Reader) ([]model.InvoiceTemplateLine, error) {
 	return items, nil
 }
 
+// parseItemsYAML reads YAML array of InvoiceTemplateLine from a reader.
+func parseItemsYAML(r io.Reader) ([]model.InvoiceTemplateLine, error) {
+	var items []model.InvoiceTemplateLine
+	if err := yaml.NewDecoder(r).Decode(&items); err != nil {
+		return nil, fmt.Errorf("parsing items YAML: %w", err)
+	}
+	return items, nil
+}
+
+// parseItemsFromFile reads line items from a file, detecting format by extension.
+// .yaml and .yml files are parsed as YAML; everything else as JSON.
+func parseItemsFromFile(path string) ([]model.InvoiceTemplateLine, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("opening items file: %w", err)
+	}
+	defer f.Close()
+
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".yaml" || ext == ".yml" {
+		return parseItemsYAML(f)
+	}
+	return parseItemsJSON(f)
+}
+
 // resolveLineItems resolves line items from --items-stdin, --items-file, or --item flags.
 // Priority: stdin > file > flags.
 func resolveLineItems(itemFlags []string, itemsFile string, itemsStdin bool) ([]model.InvoiceTemplateLine, error) {
 	if itemsStdin {
-		return parseItemsFromReader(os.Stdin)
+		return parseItemsJSON(os.Stdin)
 	}
 	if itemsFile != "" {
-		f, err := os.Open(itemsFile)
-		if err != nil {
-			return nil, fmt.Errorf("opening items file: %w", err)
-		}
-		defer f.Close()
-		return parseItemsFromReader(f)
+		return parseItemsFromFile(itemsFile)
 	}
 	if len(itemFlags) > 0 {
 		items := make([]model.InvoiceTemplateLine, 0, len(itemFlags))

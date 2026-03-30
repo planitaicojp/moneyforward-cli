@@ -83,6 +83,8 @@ var (
 	billingsUpdateBillingDate string
 	billingsUpdateDueDate     string
 	billingsUpdateSalesDate   string
+	billingsUpdateItemsFile   string
+	billingsUpdateItemsStdin  bool
 	billingsUpdateDryRun      bool
 )
 
@@ -149,7 +151,7 @@ func init() {
 	billingsCreateCmd.Flags().StringVar(&billingsCreateDueDate, "due-date", "", "due date YYYY-MM-DD")
 	billingsCreateCmd.Flags().StringVar(&billingsCreateSalesDate, "sales-date", "", "sales date YYYY-MM-DD")
 	billingsCreateCmd.Flags().StringArrayVar(&billingsCreateItemFlags, "item", nil, `line item: "name=X,price=N,quantity=N,excise=10"`)
-	billingsCreateCmd.Flags().StringVar(&billingsCreateItemsFile, "items-file", "", "JSON file with line items")
+	billingsCreateCmd.Flags().StringVar(&billingsCreateItemsFile, "items-file", "", "JSON or YAML file with line items")
 	billingsCreateCmd.Flags().BoolVar(&billingsCreateItemsStdin, "items-stdin", false, "read line items from stdin as JSON")
 	billingsCreateCmd.Flags().BoolVar(&billingsCreateDryRun, "dry-run", false, "print request body without sending")
 	_ = billingsCreateCmd.MarkFlagRequired("partner-id")
@@ -161,6 +163,8 @@ func init() {
 	billingsUpdateCmd.Flags().StringVar(&billingsUpdateBillingDate, "billing-date", "", "billing date YYYY-MM-DD")
 	billingsUpdateCmd.Flags().StringVar(&billingsUpdateDueDate, "due-date", "", "due date YYYY-MM-DD")
 	billingsUpdateCmd.Flags().StringVar(&billingsUpdateSalesDate, "sales-date", "", "sales date YYYY-MM-DD")
+	billingsUpdateCmd.Flags().StringVar(&billingsUpdateItemsFile, "items-file", "", "JSON or YAML file with line items")
+	billingsUpdateCmd.Flags().BoolVar(&billingsUpdateItemsStdin, "items-stdin", false, "read line items from stdin as JSON")
 	billingsUpdateCmd.Flags().BoolVar(&billingsUpdateDryRun, "dry-run", false, "print request body without sending")
 
 	billingsDeleteCmd.Flags().BoolVar(&billingsDeleteYes, "yes", false, "skip confirmation prompt")
@@ -182,7 +186,7 @@ func init() {
 
 // resolvePartnerID resolves --partner name to partner_id via search.
 func resolvePartnerID(svc *api.InvoiceService, name string) (string, error) {
-	partners, _, err := svc.ListPartners(pagination.Params{Page: 1, PerPage: 25}, name)
+	partners, _, err := svc.ListPartners(pagination.Params{Page: 1, PerPage: 100}, name)
 	if err != nil {
 		return "", fmt.Errorf("searching partner %q: %w", name, err)
 	}
@@ -348,6 +352,15 @@ func runBillingsUpdate(cmd *cobra.Command, args []string) error {
 		params.SalesDate = &billingsUpdateSalesDate
 	}
 
+	// Resolve line items for update.
+	items, err := resolveLineItems(nil, billingsUpdateItemsFile, billingsUpdateItemsStdin)
+	if err != nil {
+		return err
+	}
+	if items != nil {
+		params.Items = items
+	}
+
 	if billingsUpdateDryRun {
 		wrapped := map[string]any{"billing": params}
 		enc := json.NewEncoder(os.Stdout)
@@ -384,6 +397,12 @@ func runBillingsDelete(cmd *cobra.Command, args []string) error {
 }
 
 func runBillingsSetPaymentStatus(cmd *cobra.Command, args []string) error {
+	switch billingsSetStatusValue {
+	case "unsettled", "settled":
+	default:
+		return fmt.Errorf("invalid payment status %q: must be unsettled or settled", billingsSetStatusValue)
+	}
+
 	svc, err := newInvoiceService(cmd)
 	if err != nil {
 		return err
@@ -417,8 +436,8 @@ func runBillingsPDF(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Download PDF.
-	resp, err := http.Get(pdfURL)
+	// Download PDF using authenticated client.
+	resp, err := svc.DownloadPDF(pdfURL)
 	if err != nil {
 		return fmt.Errorf("downloading PDF: %w", err)
 	}
