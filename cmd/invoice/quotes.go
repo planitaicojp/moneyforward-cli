@@ -79,6 +79,7 @@ var (
 	quotesUpdateMemo        string
 	quotesUpdateQuoteDate   string
 	quotesUpdateExpiredDate string
+	quotesUpdateItemFlags   []string
 	quotesUpdateItemsFile   string
 	quotesUpdateItemsStdin  bool
 	quotesUpdateDryRun      bool
@@ -164,6 +165,7 @@ func init() {
 	quotesUpdateCmd.Flags().StringVar(&quotesUpdateMemo, "memo", "", "memo")
 	quotesUpdateCmd.Flags().StringVar(&quotesUpdateQuoteDate, "quote-date", "", "quote date YYYY-MM-DD")
 	quotesUpdateCmd.Flags().StringVar(&quotesUpdateExpiredDate, "expired-date", "", "expiry date YYYY-MM-DD")
+	quotesUpdateCmd.Flags().StringArrayVar(&quotesUpdateItemFlags, "item", nil, `line item: "name=X,price=N,quantity=N,excise=10"`)
 	quotesUpdateCmd.Flags().StringVar(&quotesUpdateItemsFile, "items-file", "", "JSON or YAML file with line items")
 	quotesUpdateCmd.Flags().BoolVar(&quotesUpdateItemsStdin, "items-stdin", false, "read line items from stdin as JSON")
 	quotesUpdateCmd.Flags().BoolVar(&quotesUpdateDryRun, "dry-run", false, "print request body without sending")
@@ -331,7 +333,7 @@ func runQuotesUpdate(cmd *cobra.Command, args []string) error {
 		params.ExpiredDate = &quotesUpdateExpiredDate
 	}
 
-	items, err := resolveLineItems(nil, quotesUpdateItemsFile, quotesUpdateItemsStdin)
+	items, err := resolveLineItems(quotesUpdateItemFlags, quotesUpdateItemsFile, quotesUpdateItemsStdin)
 	if err != nil {
 		return err
 	}

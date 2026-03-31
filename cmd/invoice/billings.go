@@ -83,6 +83,7 @@ var (
 	billingsUpdateBillingDate string
 	billingsUpdateDueDate     string
 	billingsUpdateSalesDate   string
+	billingsUpdateItemFlags   []string
 	billingsUpdateItemsFile   string
 	billingsUpdateItemsStdin  bool
 	billingsUpdateDryRun      bool
@@ -162,6 +163,7 @@ func init() {
 	billingsUpdateCmd.Flags().StringVar(&billingsUpdateBillingDate, "billing-date", "", "billing date YYYY-MM-DD")
 	billingsUpdateCmd.Flags().StringVar(&billingsUpdateDueDate, "due-date", "", "due date YYYY-MM-DD")
 	billingsUpdateCmd.Flags().StringVar(&billingsUpdateSalesDate, "sales-date", "", "sales date YYYY-MM-DD")
+	billingsUpdateCmd.Flags().StringArrayVar(&billingsUpdateItemFlags, "item", nil, `line item: "name=X,price=N,quantity=N,excise=10"`)
 	billingsUpdateCmd.Flags().StringVar(&billingsUpdateItemsFile, "items-file", "", "JSON or YAML file with line items")
 	billingsUpdateCmd.Flags().BoolVar(&billingsUpdateItemsStdin, "items-stdin", false, "read line items from stdin as JSON")
 	billingsUpdateCmd.Flags().BoolVar(&billingsUpdateDryRun, "dry-run", false, "print request body without sending")
@@ -357,7 +359,7 @@ func runBillingsUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve line items for update.
-	items, err := resolveLineItems(nil, billingsUpdateItemsFile, billingsUpdateItemsStdin)
+	items, err := resolveLineItems(billingsUpdateItemFlags, billingsUpdateItemsFile, billingsUpdateItemsStdin)
 	if err != nil {
 		return err
 	}
