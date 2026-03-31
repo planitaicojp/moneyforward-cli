@@ -147,6 +147,394 @@ func TestInvoiceService_ListPartners_WithQuery(t *testing.T) {
 	}
 }
 
+func TestInvoiceService_ListQuotes(t *testing.T) {
+	subtotal, total := 3000, 3300
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/quotes" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		q := r.URL.Query()
+		if q.Get("page") != "1" {
+			t.Errorf("page = %q, want %q", q.Get("page"), "1")
+		}
+		if q.Get("per_page") != "25" {
+			t.Errorf("per_page = %q, want %q", q.Get("per_page"), "25")
+		}
+		if q.Get("partner_id") != "p1" {
+			t.Errorf("partner_id = %q, want %q", q.Get("partner_id"), "p1")
+		}
+		if q.Get("status") != "draft" {
+			t.Errorf("status = %q, want %q", q.Get("status"), "draft")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		resp := map[string]interface{}{
+			"data": []model.Quote{
+				{ID: "q1", Title: "Quote 1", Status: model.QuoteStatusDraft, Subtotal: &subtotal, TotalPrice: &total, CreatedAt: "2024-01-01", UpdatedAt: "2024-01-01"},
+			},
+			"pagination": map[string]int{
+				"total_count":  1,
+				"total_pages":  1,
+				"current_page": 1,
+				"per_page":     25,
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	opts := api.QuoteListOptions{
+		Params:    pagination.Params{Page: 1, PerPage: 25},
+		PartnerID: "p1",
+		Status:    "draft",
+	}
+	quotes, pag, err := svc.ListQuotes(opts)
+	if err != nil {
+		t.Fatalf("ListQuotes() error: %v", err)
+	}
+	if len(quotes) != 1 {
+		t.Errorf("len(quotes) = %d, want 1", len(quotes))
+	}
+	if quotes[0].ID != "q1" {
+		t.Errorf("quotes[0].ID = %q, want %q", quotes[0].ID, "q1")
+	}
+	if quotes[0].Status != model.QuoteStatusDraft {
+		t.Errorf("quotes[0].Status = %q, want %q", quotes[0].Status, model.QuoteStatusDraft)
+	}
+	if pag.TotalCount != 1 {
+		t.Errorf("pag.TotalCount = %d, want 1", pag.TotalCount)
+	}
+}
+
+func TestInvoiceService_GetQuote(t *testing.T) {
+	subtotal, total := 5000, 5500
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/quotes/q1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(model.Quote{
+			ID:          "q1",
+			Title:       "Test Quote",
+			Status:      model.QuoteStatusSent,
+			PDFURL:      "https://example.com/q1.pdf",
+			QuoteDate:   "2024-06-01",
+			ExpiredDate: "2024-07-01",
+			Subtotal:    &subtotal,
+			TotalPrice:  &total,
+			CreatedAt:   "2024-01-01",
+			UpdatedAt:   "2024-01-01",
+		})
+	})
+
+	quote, err := svc.GetQuote("q1")
+	if err != nil {
+		t.Fatalf("GetQuote() error: %v", err)
+	}
+	if quote.ID != "q1" {
+		t.Errorf("quote.ID = %q, want %q", quote.ID, "q1")
+	}
+	if quote.Title != "Test Quote" {
+		t.Errorf("quote.Title = %q, want %q", quote.Title, "Test Quote")
+	}
+	if quote.PDFURL != "https://example.com/q1.pdf" {
+		t.Errorf("quote.PDFURL = %q, want %q", quote.PDFURL, "https://example.com/q1.pdf")
+	}
+	if quote.Status != model.QuoteStatusSent {
+		t.Errorf("quote.Status = %q, want %q", quote.Status, model.QuoteStatusSent)
+	}
+}
+
+func TestInvoiceService_CreateQuote(t *testing.T) {
+	subtotal, total := 10000, 11000
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/quotes" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		if ct := r.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
+			t.Errorf("Content-Type = %q, want application/json", ct)
+		}
+
+		var body model.CreateQuoteParams
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding body: %v", err)
+		}
+		if body.DepartmentID != "d1" {
+			t.Errorf("body.DepartmentID = %q, want %q", body.DepartmentID, "d1")
+		}
+		if body.QuoteDate != "2024-06-01" {
+			t.Errorf("body.QuoteDate = %q, want %q", body.QuoteDate, "2024-06-01")
+		}
+		if body.ExpiredDate != "2024-07-01" {
+			t.Errorf("body.ExpiredDate = %q, want %q", body.ExpiredDate, "2024-07-01")
+		}
+		if len(body.Items) != 1 {
+			t.Fatalf("len(body.Items) = %d, want 1", len(body.Items))
+		}
+		if body.Items[0].Name != "Consulting" {
+			t.Errorf("body.Items[0].Name = %q, want %q", body.Items[0].Name, "Consulting")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(model.Quote{
+			ID:           "q-new",
+			DepartmentID: body.DepartmentID,
+			QuoteDate:    body.QuoteDate,
+			ExpiredDate:  body.ExpiredDate,
+			Status:       model.QuoteStatusDraft,
+			Subtotal:     &subtotal,
+			TotalPrice:   &total,
+			CreatedAt:    "2024-06-01",
+			UpdatedAt:    "2024-06-01",
+		})
+	})
+
+	params := model.CreateQuoteParams{
+		DepartmentID: "d1",
+		QuoteDate:    "2024-06-01",
+		ExpiredDate:  "2024-07-01",
+		Items: []model.InvoiceTemplateLine{
+			{Name: "Consulting", Price: 10000, Quantity: 1, Excise: "ten_percent"},
+		},
+	}
+	quote, err := svc.CreateQuote(params)
+	if err != nil {
+		t.Fatalf("CreateQuote() error: %v", err)
+	}
+	if quote.ID != "q-new" {
+		t.Errorf("quote.ID = %q, want %q", quote.ID, "q-new")
+	}
+	if quote.Status != model.QuoteStatusDraft {
+		t.Errorf("quote.Status = %q, want %q", quote.Status, model.QuoteStatusDraft)
+	}
+}
+
+func TestInvoiceService_UpdateQuote(t *testing.T) {
+	newTitle := "Updated Quote"
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/quotes/q1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPatch {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+
+		var body model.UpdateQuoteParams
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding body: %v", err)
+		}
+		if body.Title == nil || *body.Title != "Updated Quote" {
+			t.Errorf("body.Title = %v, want pointer to %q", body.Title, "Updated Quote")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(model.Quote{
+			ID:        "q1",
+			Title:     *body.Title,
+			Status:    model.QuoteStatusDraft,
+			CreatedAt: "2024-01-01",
+			UpdatedAt: "2024-06-01",
+		})
+	})
+
+	params := model.UpdateQuoteParams{Title: &newTitle}
+	quote, err := svc.UpdateQuote("q1", params)
+	if err != nil {
+		t.Fatalf("UpdateQuote() error: %v", err)
+	}
+	if quote.Title != "Updated Quote" {
+		t.Errorf("quote.Title = %q, want %q", quote.Title, "Updated Quote")
+	}
+}
+
+func TestInvoiceService_DeleteQuote(t *testing.T) {
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/quotes/q1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodDelete {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := svc.DeleteQuote("q1")
+	if err != nil {
+		t.Fatalf("DeleteQuote() error: %v", err)
+	}
+}
+
+func TestInvoiceService_SetQuoteStatus(t *testing.T) {
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/quotes/q1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPatch {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+
+		var body map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding body: %v", err)
+		}
+		if body["status"] != "sent" {
+			t.Errorf("body[status] = %v, want %q", body["status"], "sent")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(model.Quote{
+			ID:        "q1",
+			Status:    model.QuoteStatusSent,
+			CreatedAt: "2024-01-01",
+			UpdatedAt: "2024-06-01",
+		})
+	})
+
+	quote, err := svc.SetQuoteStatus("q1", model.QuoteStatusSent)
+	if err != nil {
+		t.Fatalf("SetQuoteStatus() error: %v", err)
+	}
+	if quote.Status != model.QuoteStatusSent {
+		t.Errorf("quote.Status = %q, want %q", quote.Status, model.QuoteStatusSent)
+	}
+}
+
+func TestInvoiceService_ConvertQuoteToBilling(t *testing.T) {
+	subtotal, total := 10000, 11000
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/quotes/q1/convert_to_billing" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+
+		var body map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding body: %v", err)
+		}
+		if len(body) != 0 {
+			t.Errorf("body should be empty, got %v", body)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(model.Billing{
+			ID:            "b-converted",
+			PaymentStatus: model.PaymentStatusUnsettled,
+			Subtotal:      &subtotal,
+			TotalPrice:    &total,
+			CreatedAt:     "2024-06-01",
+			UpdatedAt:     "2024-06-01",
+		})
+	})
+
+	billing, err := svc.ConvertQuoteToBilling("q1")
+	if err != nil {
+		t.Fatalf("ConvertQuoteToBilling() error: %v", err)
+	}
+	if billing.ID != "b-converted" {
+		t.Errorf("billing.ID = %q, want %q", billing.ID, "b-converted")
+	}
+	if billing.PaymentStatus != model.PaymentStatusUnsettled {
+		t.Errorf("billing.PaymentStatus = %q, want %q", billing.PaymentStatus, model.PaymentStatusUnsettled)
+	}
+}
+
+func TestInvoiceService_GetQuotePDF(t *testing.T) {
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/quotes/q1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(model.Quote{
+			ID:        "q1",
+			PDFURL:    "https://example.com/q1.pdf",
+			Status:    model.QuoteStatusDraft,
+			CreatedAt: "2024-01-01",
+			UpdatedAt: "2024-01-01",
+		})
+	})
+
+	pdfURL, err := svc.GetQuotePDF("q1")
+	if err != nil {
+		t.Fatalf("GetQuotePDF() error: %v", err)
+	}
+	if pdfURL != "https://example.com/q1.pdf" {
+		t.Errorf("pdfURL = %q, want %q", pdfURL, "https://example.com/q1.pdf")
+	}
+}
+
+func TestInvoiceService_ListSentHistories(t *testing.T) {
+	svc, _ := newTestInvoiceService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/sent_histories" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		q := r.URL.Query()
+		if q.Get("page") != "1" {
+			t.Errorf("page = %q, want %q", q.Get("page"), "1")
+		}
+		if q.Get("per_page") != "25" {
+			t.Errorf("per_page = %q, want %q", q.Get("per_page"), "25")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		resp := map[string]interface{}{
+			"data": []model.SentHistory{
+				{ID: "sh1", Type: "billing", DocumentID: "b1", Operator: "user@example.com", SentAt: "2024-06-01T10:00:00Z", CreatedAt: "2024-06-01", UpdatedAt: "2024-06-01"},
+				{ID: "sh2", Type: "quote", DocumentID: "q1", Operator: "user@example.com", SentAt: "2024-06-02T10:00:00Z", CreatedAt: "2024-06-02", UpdatedAt: "2024-06-02"},
+			},
+			"pagination": map[string]int{
+				"total_count":  2,
+				"total_pages":  1,
+				"current_page": 1,
+				"per_page":     25,
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	params := pagination.Params{Page: 1, PerPage: 25}
+	histories, pag, err := svc.ListSentHistories(params)
+	if err != nil {
+		t.Fatalf("ListSentHistories() error: %v", err)
+	}
+	if len(histories) != 2 {
+		t.Errorf("len(histories) = %d, want 2", len(histories))
+	}
+	if histories[0].ID != "sh1" {
+		t.Errorf("histories[0].ID = %q, want %q", histories[0].ID, "sh1")
+	}
+	if histories[0].Type != "billing" {
+		t.Errorf("histories[0].Type = %q, want %q", histories[0].Type, "billing")
+	}
+	if histories[1].DocumentID != "q1" {
+		t.Errorf("histories[1].DocumentID = %q, want %q", histories[1].DocumentID, "q1")
+	}
+	if pag.TotalCount != 2 {
+		t.Errorf("pag.TotalCount = %d, want 2", pag.TotalCount)
+	}
+}
+
 func TestInvoiceService_GetPartner(t *testing.T) {
 	dept := model.PartnerDepartment{
 		ID:   "d1",

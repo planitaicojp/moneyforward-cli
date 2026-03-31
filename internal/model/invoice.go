@@ -186,3 +186,80 @@ type UpdateBillingParams struct {
 	SalesDate        *string               `json:"sales_date,omitempty"`
 	Items            []InvoiceTemplateLine  `json:"items,omitempty"`
 }
+
+// --- Quote ---
+
+type QuoteStatus string
+
+const (
+	QuoteStatusDraft     QuoteStatus = "draft"
+	QuoteStatusSent      QuoteStatus = "sent"
+	QuoteStatusAccepted  QuoteStatus = "accepted"
+	QuoteStatusRejected  QuoteStatus = "rejected"
+	QuoteStatusCancelled QuoteStatus = "cancelled"
+)
+
+type Quote struct {
+	ID            string      `json:"id"`
+	PDFURL        string      `json:"pdf_url,omitempty"`
+	OperatorID    string      `json:"operator_id,omitempty"`
+	DepartmentID  string      `json:"department_id,omitempty"`
+	PartnerID     string      `json:"partner_id,omitempty"`
+	PartnerName   string      `json:"partner_name,omitempty"`
+	PartnerDetail string      `json:"partner_detail,omitempty"`
+	Title         string      `json:"title,omitempty"`
+	Memo          string      `json:"memo,omitempty"`
+	QuoteNumber   string      `json:"quote_number,omitempty"`
+	QuoteDate     string      `json:"quote_date,omitempty"`
+	ExpiredDate   string      `json:"expired_date,omitempty"`
+	Status        QuoteStatus `json:"status"`
+	Subtotal      *int        `json:"subtotal,omitempty"`
+	TotalPrice    *int        `json:"total_price,omitempty"`
+	Tax           *int        `json:"tax,omitempty"`
+	Items         []QuoteItem `json:"items"`
+	CreatedAt     string      `json:"created_at"`
+	UpdatedAt     string      `json:"updated_at"`
+}
+
+type QuoteItem struct {
+	ID                     string `json:"id,omitempty"`
+	Name                   string `json:"name"`
+	Code                   string `json:"code,omitempty"`
+	Detail                 string `json:"detail,omitempty"`
+	Unit                   string `json:"unit,omitempty"`
+	Price                  int    `json:"price"`
+	Quantity               int    `json:"quantity"`
+	IsDeductWithholdingTax *bool  `json:"is_deduct_withholding_tax,omitempty"`
+	Excise                 string `json:"excise,omitempty"`
+}
+
+// CreateQuoteParams is sent to POST /quotes (direct, no wrapping).
+type CreateQuoteParams struct {
+	DepartmentID string                `json:"department_id"`
+	QuoteDate    string                `json:"quote_date"`
+	ExpiredDate  string                `json:"expired_date"`
+	Title        string                `json:"title,omitempty"`
+	Memo         string                `json:"memo,omitempty"`
+	Items        []InvoiceTemplateLine `json:"items,omitempty"`
+}
+
+// UpdateQuoteParams is sent to PATCH /quotes/{id} (direct, no wrapping).
+type UpdateQuoteParams struct {
+	Title       *string               `json:"title,omitempty"`
+	Memo        *string               `json:"memo,omitempty"`
+	QuoteDate   *string               `json:"quote_date,omitempty"`
+	ExpiredDate *string               `json:"expired_date,omitempty"`
+	Items       []InvoiceTemplateLine  `json:"items,omitempty"`
+}
+
+// --- Sent History ---
+
+type SentHistory struct {
+	ID         string `json:"id"`
+	Type       string `json:"type,omitempty"`
+	DocumentID string `json:"document_id,omitempty"`
+	Operator   string `json:"operator,omitempty"`
+	SentAt     string `json:"sent_at,omitempty"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
+}
