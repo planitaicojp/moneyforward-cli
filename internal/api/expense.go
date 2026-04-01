@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"github.com/planitaicojp/moneyforward-cli/internal/model"
 )
@@ -79,7 +78,7 @@ func doExpenseList[T any](s *ExpenseService, url, key string) ([]T, bool, error)
 }
 
 func (s *ExpenseService) ListOffices(page int) ([]model.ExpenseOffice, bool, error) {
-	u := fmt.Sprintf("%s/offices?page=%s", s.base, strconv.Itoa(page))
+	u := fmt.Sprintf("%s/offices?page=%d", s.base, page)
 	items, hasNext, err := doExpenseList[model.ExpenseOffice](s, u, "offices")
 	if err != nil {
 		return nil, false, fmt.Errorf("listing offices: %w", err)
@@ -89,7 +88,7 @@ func (s *ExpenseService) ListOffices(page int) ([]model.ExpenseOffice, bool, err
 
 // --- Depts ---
 func (s *ExpenseService) ListDepts(officeID string, page int, keyword string) ([]model.Dept, bool, error) {
-	u := fmt.Sprintf("%s/offices/%s/depts?page=%d", s.base, officeID, page)
+	u := fmt.Sprintf("%s/offices/%s/depts?page=%d", s.base, url.PathEscape(officeID), page)
 	if keyword != "" {
 		u += "&search_keyword=" + url.QueryEscape(keyword)
 	}
@@ -102,7 +101,7 @@ func (s *ExpenseService) ListDepts(officeID string, page int, keyword string) ([
 
 func (s *ExpenseService) GetDept(officeID, id string) (*model.Dept, error) {
 	var dept model.Dept
-	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/depts/%s", s.base, officeID, id), nil, &dept)
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/depts/%s", s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, &dept)
 	if err != nil {
 		return nil, fmt.Errorf("getting dept: %w", err)
 	}
@@ -111,7 +110,7 @@ func (s *ExpenseService) GetDept(officeID, id string) (*model.Dept, error) {
 
 // --- Projects ---
 func (s *ExpenseService) ListProjects(officeID string, page int, keyword string) ([]model.ExpenseProject, bool, error) {
-	u := fmt.Sprintf("%s/offices/%s/projects?page=%d", s.base, officeID, page)
+	u := fmt.Sprintf("%s/offices/%s/projects?page=%d", s.base, url.PathEscape(officeID), page)
 	if keyword != "" {
 		u += "&search_keyword=" + url.QueryEscape(keyword)
 	}
@@ -124,7 +123,7 @@ func (s *ExpenseService) ListProjects(officeID string, page int, keyword string)
 
 func (s *ExpenseService) GetProject(officeID, id string) (*model.ExpenseProject, error) {
 	var project model.ExpenseProject
-	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/projects/%s", s.base, officeID, id), nil, &project)
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/projects/%s", s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, &project)
 	if err != nil {
 		return nil, fmt.Errorf("getting project: %w", err)
 	}
@@ -133,7 +132,7 @@ func (s *ExpenseService) GetProject(officeID, id string) (*model.ExpenseProject,
 
 // --- ExItems (経費科目) ---
 func (s *ExpenseService) ListExItems(officeID string, page int, keyword string) ([]model.ExItem, bool, error) {
-	u := fmt.Sprintf("%s/offices/%s/ex_items?page=%d", s.base, officeID, page)
+	u := fmt.Sprintf("%s/offices/%s/ex_items?page=%d", s.base, url.PathEscape(officeID), page)
 	if keyword != "" {
 		u += "&search_keyword=" + url.QueryEscape(keyword)
 	}
@@ -146,7 +145,7 @@ func (s *ExpenseService) ListExItems(officeID string, page int, keyword string) 
 
 func (s *ExpenseService) GetExItem(officeID, id string) (*model.ExItem, error) {
 	var item model.ExItem
-	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/ex_items/%s", s.base, officeID, id), nil, &item)
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/ex_items/%s", s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, &item)
 	if err != nil {
 		return nil, fmt.Errorf("getting ex_item: %w", err)
 	}
@@ -155,7 +154,7 @@ func (s *ExpenseService) GetExItem(officeID, id string) (*model.ExItem, error) {
 
 // --- Excises (税区分) ---
 func (s *ExpenseService) ListExcises(officeID string, page int) ([]model.ExpenseExcise, bool, error) {
-	u := fmt.Sprintf("%s/offices/%s/excises?page=%d", s.base, officeID, page)
+	u := fmt.Sprintf("%s/offices/%s/excises?page=%d", s.base, url.PathEscape(officeID), page)
 	items, hasNext, err := doExpenseList[model.ExpenseExcise](s, u, "excises")
 	if err != nil {
 		return nil, false, fmt.Errorf("listing excises: %w", err)
@@ -165,7 +164,7 @@ func (s *ExpenseService) ListExcises(officeID string, page int) ([]model.Expense
 
 func (s *ExpenseService) GetExcise(officeID, id string) (*model.ExpenseExcise, error) {
 	var excise model.ExpenseExcise
-	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/excises/%s", s.base, officeID, id), nil, &excise)
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/excises/%s", s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, &excise)
 	if err != nil {
 		return nil, fmt.Errorf("getting excise: %w", err)
 	}
@@ -174,7 +173,7 @@ func (s *ExpenseService) GetExcise(officeID, id string) (*model.ExpenseExcise, e
 
 // --- Positions (役職) ---
 func (s *ExpenseService) ListPositions(officeID string, page int) ([]model.Position, bool, error) {
-	u := fmt.Sprintf("%s/offices/%s/positions?page=%d", s.base, officeID, page)
+	u := fmt.Sprintf("%s/offices/%s/positions?page=%d", s.base, url.PathEscape(officeID), page)
 	items, hasNext, err := doExpenseList[model.Position](s, u, "positions")
 	if err != nil {
 		return nil, false, fmt.Errorf("listing positions: %w", err)
@@ -184,7 +183,7 @@ func (s *ExpenseService) ListPositions(officeID string, page int) ([]model.Posit
 
 func (s *ExpenseService) GetPosition(officeID, id string) (*model.Position, error) {
 	var pos model.Position
-	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/positions/%s", s.base, officeID, id), nil, &pos)
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/positions/%s", s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, &pos)
 	if err != nil {
 		return nil, fmt.Errorf("getting position: %w", err)
 	}

@@ -2,7 +2,8 @@ package cmdutil
 
 import "time"
 
-// FetchAllExpense fetches all pages from an Expense API endpoint using cursor-based pagination.
+// FetchAllExpense fetches all pages from an Expense API endpoint.
+// The Expense API signals more pages via a non-nil "next" link in the response.
 func FetchAllExpense[T any](fetchPage func(page int) ([]T, bool, error)) ([]T, error) {
 	var all []T
 	page := 1
@@ -16,7 +17,7 @@ func FetchAllExpense[T any](fetchPage func(page int) ([]T, bool, error)) ([]T, e
 			break
 		}
 		page++
-		time.Sleep(400 * time.Millisecond)
+		time.Sleep(rateLimitDelay)
 	}
 	return all, nil
 }

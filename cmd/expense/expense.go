@@ -2,6 +2,7 @@ package expense
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -57,10 +58,11 @@ func resolveOfficeID(cmd *cobra.Command, svc *api.ExpenseService) (string, error
 	case 1:
 		return offices[0].ID, nil
 	default:
-		msg := "multiple offices found; specify --office-id:\n"
+		var b strings.Builder
+		b.WriteString("multiple offices found; specify --office-id:\n")
 		for _, o := range offices {
-			msg += fmt.Sprintf("  %s  %s\n", o.ID, o.Name)
+			fmt.Fprintf(&b, "  %s  %s\n", o.ID, o.Name)
 		}
-		return "", fmt.Errorf("%s", msg)
+		return "", fmt.Errorf("%s", b.String())
 	}
 }
