@@ -177,3 +177,62 @@ func (c *Client) DoJSON(method, url string, body interface{}, target interface{}
 
 	return nil
 }
+
+// DoRaw sends a JSON request and returns the raw response bytes.
+func (c *Client) DoRaw(method, url string, body interface{}) ([]byte, error) {
+	var reqBody io.Reader
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("marshaling request: %w", err)
+		}
+		reqBody = bytes.NewReader(data)
+	}
+
+	req, err := http.NewRequest(method, url, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if c.verbose && len(respBytes) > 0 {
+		fmt.Fprintf(os.Stderr, "< body: %s\n", string(respBytes))
+	}
+
+	if resp.StatusCode >= 400 {
+		var apiErr struct {
+			Error   string `json:"error"`
+			Message string `json:"message"`
+			Code    string `json:"code"`
+		}
+		_ = json.Unmarshal(respBytes, &apiErr)
+		msg := apiErr.Message
+		if msg == "" {
+			msg = apiErr.Error
+		}
+		if msg == "" {
+			msg = string(respBytes)
+		}
+		return nil, &cerrors.APIError{
+			StatusCode: resp.StatusCode,
+			Code:       apiErr.Code,
+			Message:    msg,
+		}
+	}
+
+	return respBytes, nil
+}
