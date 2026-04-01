@@ -46,7 +46,7 @@ func runSentHistoriesList(cmd *cobra.Command, args []string) error {
 	f := output.New(format)
 
 	if sentHistoriesListAll {
-		allHistories, err := fetchAll(func(page int) ([]model.SentHistory, *pagination.Result, error) {
+		allHistories, err := cmdutil.FetchAll(func(page int) ([]model.SentHistory, *pagination.Result, error) {
 			return svc.ListSentHistories(pagination.Params{Page: page, PerPage: 100})
 		})
 		if err != nil {

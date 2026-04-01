@@ -187,7 +187,7 @@ func init() {
 
 // resolvePartnerID resolves --partner name to partner_id via search.
 func resolvePartnerID(svc *api.InvoiceService, name string) (string, error) {
-	partners, err := fetchAll(func(page int) ([]model.Partner, *pagination.Result, error) {
+	partners, err := cmdutil.FetchAll(func(page int) ([]model.Partner, *pagination.Result, error) {
 		return svc.ListPartners(pagination.Params{Page: page, PerPage: 100}, name)
 	})
 	if err != nil {
@@ -221,7 +221,7 @@ func runBillingsList(cmd *cobra.Command, args []string) error {
 	f := output.New(format)
 
 	if billingsListAll {
-		allBillings, err := fetchAll(func(page int) ([]model.Billing, *pagination.Result, error) {
+		allBillings, err := cmdutil.FetchAll(func(page int) ([]model.Billing, *pagination.Result, error) {
 			opts := api.BillingListOptions{
 				Params:        pagination.Params{Page: page, PerPage: 100},
 				PartnerID:     partnerID,

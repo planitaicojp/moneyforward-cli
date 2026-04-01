@@ -132,7 +132,7 @@ func runItemsList(cmd *cobra.Command, args []string) error {
 	f := output.New(format)
 
 	if itemsListAll {
-		allItems, err := fetchAll(func(page int) ([]model.Item, *pagination.Result, error) {
+		allItems, err := cmdutil.FetchAll(func(page int) ([]model.Item, *pagination.Result, error) {
 			return svc.ListItems(pagination.Params{Page: page, PerPage: 100}, itemsListQuery)
 		})
 		if err != nil {

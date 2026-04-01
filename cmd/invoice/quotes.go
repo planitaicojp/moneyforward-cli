@@ -206,7 +206,7 @@ func runQuotesList(cmd *cobra.Command, args []string) error {
 	f := output.New(format)
 
 	if quotesListAll {
-		allQuotes, err := fetchAll(func(page int) ([]model.Quote, *pagination.Result, error) {
+		allQuotes, err := cmdutil.FetchAll(func(page int) ([]model.Quote, *pagination.Result, error) {
 			opts := api.QuoteListOptions{
 				Params:    pagination.Params{Page: page, PerPage: 100},
 				PartnerID: partnerID,
