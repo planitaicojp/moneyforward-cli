@@ -203,3 +203,52 @@ func TestExpenseService_ListPositions(t *testing.T) {
 		t.Error("hasNext = true, want false")
 	}
 }
+
+func TestExpenseService_ListProjects(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/projects" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if kw := r.URL.Query().Get("search_keyword"); kw != "alpha" {
+			t.Errorf("search_keyword = %q, want %q", kw, "alpha")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"projects": []model.ExpenseProject{
+				{ID: "p1", Name: "Project Alpha", Code: "PA", IsActive: true},
+			},
+			"next": nil,
+		})
+	})
+
+	projects, hasNext, err := svc.ListProjects("off1", 1, "alpha")
+	if err != nil {
+		t.Fatalf("ListProjects() error: %v", err)
+	}
+	if len(projects) != 1 || projects[0].Code != "PA" {
+		t.Errorf("unexpected projects: %+v", projects)
+	}
+	if hasNext {
+		t.Error("hasNext = true, want false")
+	}
+}
+
+func TestExpenseService_GetProject(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/projects/p1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.ExpenseProject{
+			ID: "p1", Name: "Project Alpha", Code: "PA", IsActive: true,
+		})
+	})
+
+	project, err := svc.GetProject("off1", "p1")
+	if err != nil {
+		t.Fatalf("GetProject() error: %v", err)
+	}
+	if project.Name != "Project Alpha" {
+		t.Errorf("project.Name = %q, want %q", project.Name, "Project Alpha")
+	}
+}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/planitaicojp/moneyforward-cli/cmd/cmdutil"
 	"github.com/planitaicojp/moneyforward-cli/internal/api"
+	"github.com/planitaicojp/moneyforward-cli/internal/config"
 )
 
 var officeIDFlag string
@@ -44,25 +45,42 @@ func newExpenseService(cmd *cobra.Command) (*api.ExpenseService, error) {
 	return api.NewExpenseServiceDefault(client), nil
 }
 
+// resolveOfficeID resolves the office ID from:
+// 1. --office-id flag
+// 2. Profile config (office_id in config.yaml)
+// 3. Auto-detect: GET /offices, use if exactly 1, error if multiple.
 func resolveOfficeID(cmd *cobra.Command, svc *api.ExpenseService) (string, error) {
 	if officeIDFlag != "" {
 		return officeIDFlag, nil
 	}
-	offices, _, err := svc.ListOffices(1)
+
+	profile := cmdutil.GetProfile(cmd)
+	cfg, err := config.Load()
+	if err == nil {
+		if p, ok := cfg.Profiles[profile]; ok && p.OfficeID != "" {
+			return p.OfficeID, nil
+		}
+	}
+
+	offices, hasNext, err := svc.ListOffices(1)
 	if err != nil {
 		return "", fmt.Errorf("auto-detecting office: %w", err)
 	}
-	switch len(offices) {
-	case 0:
+
+	if len(offices) == 0 {
 		return "", fmt.Errorf("no offices found for this account")
-	case 1:
-		return offices[0].ID, nil
-	default:
-		var b strings.Builder
-		b.WriteString("multiple offices found; specify --office-id:\n")
-		for _, o := range offices {
-			fmt.Fprintf(&b, "  %s  %s\n", o.ID, o.Name)
-		}
-		return "", fmt.Errorf("%s", b.String())
 	}
+	if len(offices) == 1 && !hasNext {
+		return offices[0].ID, nil
+	}
+
+	var b strings.Builder
+	b.WriteString("multiple offices found; specify --office-id:\n")
+	for _, o := range offices {
+		fmt.Fprintf(&b, "  %s  %s\n", o.ID, o.Name)
+	}
+	if hasNext {
+		b.WriteString("  ... (more offices on next page)\n")
+	}
+	return "", fmt.Errorf("%s", b.String())
 }
