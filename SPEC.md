@@ -780,129 +780,409 @@ Invoice API では取引先に紐づく「部署 ID」(`department_id`) が請�
 
 ---
 
-## 3. Expense API v1
+## 3. Expense API
+
+> OpenAPI spec (`expense.moneyforward.com/api/index.json`) から 2026-04-01 取得・検証済み
 
 ### 3.1 Meta
 
 | 項目 | 値 |
 |------|---|
 | Base URL (v1) | `https://expense.moneyforward.com/api/external/v1` |
-| Base URL (v2) | `https://expense.moneyforward.com/api/external/v2` (office_members のみ) |
+| Base URL (v2) | `https://expense.moneyforward.com/api/external/v2` |
 | OpenAPI Spec | `https://expense.moneyforward.com/api/index.html` |
 | OpenAPI JSON | `https://expense.moneyforward.com/api/index.json` |
 | GitHub | `https://github.com/moneyforward/expense-api-doc` |
 | 認証 | OAuth2 (`expense.moneyforward.com/oauth/`) |
 | スコープ | `office_setting:write transaction:write report:write user_setting:write account:write public_resource:read` |
-| ページネーション | page-based (`page`, per_page デフォルト 25) |
+| ページネーション | page-based (`page`), デフォルト 25件/ページ |
+
+**重要**: 全エンドポイントに `{office_id}` パスパラメータが必要。事前に `/offices` で取得する。
 
 ### 3.2 エンドポイント一覧
 
-#### 自分の情報
-
-| Method | Path | スコープ | 説明 |
-|--------|------|---------|------|
-| GET | `/me` | — | 自分のオフィスメンバー情報 *(要確認)* |
+> パスはすべて Base URL からの相対パス。例: `/offices` → `https://expense.moneyforward.com/api/external/v1/offices`
 
 #### 事業所
 
 | Method | Path | 説明 |
 |--------|------|------|
-| GET | `/offices` | 所属事業所一覧 *(要確認)* |
+| GET | `/offices` | 所属事業所一覧 |
 
-#### 経費明細 (自分)
-
-| Method | Path | 説明 |
-|--------|------|------|
-| GET | `/ex_transactions` | 自分の経費明細一覧 |
-| GET | `/ex_transactions/{id}` | 詳細 |
-| POST | `/ex_transactions` | 作成 |
-| PATCH | `/ex_transactions/{id}` | 更新 |
-| DELETE | `/ex_transactions/{id}` | 削除 |
-
-#### 経費明細 (組織全体 — 管理者権限)
+#### 自分の情報 (v2)
 
 | Method | Path | 説明 |
 |--------|------|------|
-| GET | `/office/ex_transactions` | 全員の経費明細 *(要確認: パス)* |
+| GET | `v2: /offices/{office_id}/me` | アクセストークン保有者の従業員情報 |
 
-#### 申請 (Reports)
+#### 経費明細 — 自分
 
 | Method | Path | 説明 |
 |--------|------|------|
-| GET | `/ex_reports` | 自分の申請一覧 |
-| GET | `/ex_reports/{id}` | 詳細 |
-| GET | `/office/ex_reports` | 全申請一覧 (管理者) *(要確認)* |
+| GET | `/offices/{office_id}/me/ex_transactions` | 自分の経費明細一覧 |
+| GET | `/offices/{office_id}/me/ex_transactions/{id}` | 詳細 |
+| POST | `/offices/{office_id}/me/ex_transactions` | 作成 |
+| PUT | `/offices/{office_id}/me/ex_transactions/{id}` | 更新 |
+| DELETE | `/offices/{office_id}/me/ex_transactions/{id}` | 削除 |
+
+#### 経費明細 — 組織全体 (管理者権限)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/ex_transactions` | 事業者全体の経費明細一覧 |
+| GET | `/offices/{office_id}/ex_transactions/{id}` | 詳細 |
+| PUT | `/offices/{office_id}/ex_transactions/{id}` | 更新 |
+| DELETE | `/offices/{office_id}/ex_transactions/{id}` | 削除 |
+
+#### 経費明細 — 他メンバー分作成 (管理者権限)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/offices/{office_id}/office_members/{office_member_id}/ex_transactions` | 指定メンバーの経費明細作成 |
+
+#### 申請 (ExReports) — 自分
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/me/ex_reports` | 自分の申請一覧 |
+| GET | `/offices/{office_id}/me/ex_reports/{id}` | 詳細 |
+
+#### 申請 (ExReports) — 組織全体 (管理者権限)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/ex_reports` | 全申請一覧 (直近3ヶ月) |
+| GET | `/offices/{office_id}/ex_reports/{id}` | 詳細 |
+
+#### 経費申請 (ExpenseReports) — 組織全体
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/expense_reports` | 経費申請一覧 (日付フィルタ: created_at, submitted_at, approved_at) |
+
+#### 事前・各種申請 (GeneralReports)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/general_reports` | 事前・各種申請一覧 |
+
+#### 仮払申請 (SuspensePaymentReports)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/suspense_payment_reports` | 仮払申請一覧 |
 
 #### 承認
 
 | Method | Path | 説明 |
 |--------|------|------|
-| GET | `/approvals` | 承認待ち一覧 *(要確認)* |
-| PATCH | `/ex_reports/{id}/approve` | 承認 *(要確認: パス)* |
-| PATCH | `/ex_reports/{id}/reject` | 否認 *(要確認: パス)* |
+| GET | `/offices/{office_id}/me/approving_ex_reports` | 自分への承認待ち一覧 (max 50/page) |
+| GET | `/offices/{office_id}/approving_ex_reports` | 事業者全体の承認待ち一覧 |
+| POST | `/offices/{office_id}/me/approving_ex_reports/{ex_report_id}/approve` | 承認 (body: message) |
+| POST | `/offices/{office_id}/me/approving_ex_reports/{ex_report_id}/disapprove` | 差戻し (body: message, wf_step) |
 
-#### マスタデータ
-
-| Method | Path | 必要スコープ | 説明 |
-|--------|------|------------|------|
-| GET | `/departments` | `public_resource:read` | 部門一覧 |
-| GET | `/projects` | `public_resource:read` | プロジェクト一覧 |
-| GET | `/ex_categories` | `public_resource:read` | 経費カテゴリ (勘定科目) 一覧 |
-| GET | `/taxes` | `public_resource:read` | 税区分一覧 |
-| GET | `/positions` | `public_resource:read` | 役職一覧 |
-
-#### 従業員
+#### 部門 (Depts)
 
 | Method | Path | 説明 |
 |--------|------|------|
-| GET | `/v2/office_members` | 従業員一覧 (v2) *(要確認: フルパス)* |
-| GET | `/v2/office_members/{id}` | 詳細 (v2) |
+| GET | `/offices/{office_id}/depts` | 部門一覧 (search_keyword フィルタ可) |
+| GET | `/offices/{office_id}/depts/{id}` | 詳細 |
+| POST | `/offices/{office_id}/depts` | 作成 |
+| PUT | `/offices/{office_id}/depts/{id}` | 更新 |
+| DELETE | `/offices/{office_id}/depts/{id}` | 削除 |
 
-#### 仕訳
+#### プロジェクト (Projects)
 
 | Method | Path | 説明 |
 |--------|------|------|
-| GET | `/journals/ex_transactions` | 経費明細ベースの仕訳一覧 *(要確認)* |
-| GET | `/journals/ex_reports` | 申請ベースの仕訳一覧 *(要確認)* |
+| GET | `/offices/{office_id}/projects` | 一覧 (search_keyword, name, code フィルタ可) |
+| GET | `/offices/{office_id}/projects/{id}` | 詳細 |
+| POST | `/offices/{office_id}/projects` | 作成 |
+| PUT | `/offices/{office_id}/projects/{id}` | 更新 |
+| DELETE | `/offices/{office_id}/projects/{id}` | 削除 |
 
-> ⚠️ 上記エンドポイントの正確なパスは OpenAPI spec (`expense.moneyforward.com/api/index.json`) で確認すること。特に管理者向けエンドポイントはパスが変わる可能性がある。
+#### 経費科目 (ExItems) ※ SPEC旧名: ex_categories
 
-### 3.3 Go データモデル (主要型のみ)
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/ex_items` | 経費科目一覧 (max 100/page, search_keyword フィルタ可) |
+| GET | `/offices/{office_id}/ex_items/{id}` | 詳細 |
+
+#### 税区分 (Excises) ※ SPEC旧名: taxes
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/excises` | 税区分一覧 (max 100/page) |
+| GET | `/offices/{office_id}/excises/{id}` | 詳細 |
+
+#### 役職 (Positions)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/positions` | 役職一覧 (max 100/page) |
+| GET | `/offices/{office_id}/positions/{id}` | 詳細 |
+| POST | `/offices/{office_id}/positions` | 作成 |
+| PUT | `/offices/{office_id}/positions/{id}` | 更新 |
+| DELETE | `/offices/{office_id}/positions/{id}` | 削除 |
+
+#### 従業員 (v1: DEPRECATED, v2: 現行)
+
+v1 (`/offices/{office_id}/office_members`) は 2021/05 廃止予定としてマーク済み。**v2 を使用する。**
+
+| Method | Path (v2) | 説明 |
+|--------|-----------|------|
+| GET | `/offices/{office_id}/office_members` | 従業員一覧 (max 200/page, number/only_active フィルタ可) |
+| GET | `/offices/{office_id}/office_members/{id}` | 詳細 |
+| POST | `/offices/{office_id}/office_members` | 追加 |
+| PUT | `/offices/{office_id}/office_members/{id}` | 更新 |
+| DELETE | `/offices/{office_id}/office_members/{id}` | 削除 |
+
+#### 集計 (ExReportUnits)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/ex_report_units` | 集計一覧 |
+| GET | `/offices/{office_id}/ex_report_units/{id}` | 詳細 |
+
+#### 経費集計 (ExpenseReportUnits)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/expense_report_units` | 経費集計一覧 (max 25/page, payment_date フィルタ) |
+| GET | `/offices/{office_id}/expense_report_units/{id}` | 詳細 |
+
+#### 仕訳 (ExJournals)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/offices/{office_id}/ex_transactions/{ex_transaction_id}/ex_journal` | 経費明細の仕訳 |
+| GET | `/offices/{office_id}/ex_reports/{ex_report_id}/ex_journal` | 申請の仕訳 |
+| GET | `/offices/{office_id}/ex_report_units/{ex_report_unit_id}/ex_journal` | 集計の仕訳 |
+| GET | `/offices/{office_id}/ex_journals_by_ex_transactions` | 明細ベース仕訳一覧 (max 25/page, recognized_at max 3ヶ月) |
+| GET | `/offices/{office_id}/ex_journals_by_ex_reports` | 申請ベース仕訳一覧 (max 25/page, recognized_at max 3ヶ月) |
+| GET | `/offices/{office_id}/ex_journals_by_ex_invoice_transactions` | 支払明細ベース仕訳一覧 |
+| GET | `/offices/{office_id}/expense_report_units/ex_journals` | 経費集計仕訳一覧 (payment_date フィルタ) |
+| GET | `/offices/{office_id}/expense_report_unit_payments/ex_journals` | 経費集計支払仕訳一覧 |
+
+#### その他
+
+| Method | Path | 説明 |
+|--------|------|------|
+| POST | `/offices/{office_id}/me/upload_receipt` | 領収書アップロード → 経費自動登録 |
+| GET | `/offices/{office_id}/e_docs` | 電子帳簿保存法書類一覧 |
+| GET | `/offices/{office_id}/ex_invoice_transactions` | 支払明細一覧 (max 25/page) |
+
+### 3.3 主要クエリパラメータ
+
+#### ex_transactions (自分 / 組織) リスト
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| page | integer | ページ番号 |
+| query_object[dept_id] | string | 部門ID フィルタ |
+| query_object[project_id] | string | プロジェクトID フィルタ |
+| query_object[ex_item_id] | string | 経費科目ID フィルタ |
+| query_object[office_member_id] | string | 従業員ID フィルタ |
+| query_object[number_from] | integer | 明細番号 from |
+| query_object[number_to] | integer | 明細番号 to |
+| query_object[value_from] | float | 金額 from |
+| query_object[value_to] | float | 金額 to |
+| query_object[recognized_at_from] | date | 日付 from |
+| query_object[recognized_at_to] | date | 日付 to |
+| query_object[is_exported] | boolean | エクスポート済みフラグ |
+| query_object[is_reported] | boolean | 申請済みフラグ |
+
+#### expense_reports リスト
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| page | integer | ページ番号 |
+| query_object[created_at_from] | datetime | 作成日時 from |
+| query_object[created_at_to] | datetime | 作成日時 to |
+| query_object[submitted_at_from] | datetime | 申請日時 from |
+| query_object[submitted_at_to] | datetime | 申請日時 to |
+| query_object[approved_at_from] | datetime | 承認日時 from |
+| query_object[approved_at_to] | datetime | 承認日時 to |
+
+### 3.4 Go データモデル
+
+> OpenAPI definitions セクションから取得。CLI で使用する主要型のみ記載。
 
 ```go
+// Office は事業者を表す。
+type Office struct {
+    ID                 string `json:"id"`
+    IdentificationCode string `json:"identification_code"`
+    OfficeTypeID       int    `json:"office_type_id"` // 1:個人, 2:法人
+    Name               string `json:"name"`
+}
+
+// ExTransaction は経費明細を表す。
 type ExTransaction struct {
+    ID                          string  `json:"id"`
+    Number                      int     `json:"number"`
+    Remark                      string  `json:"remark"`               // 支払先・内容
+    RecognizedAt                string  `json:"recognized_at"`        // date: YYYY-MM-DD
+    Value                       float64 `json:"value"`                // 金額（税込）
+    Memo                        string  `json:"memo,omitempty"`
+    ReportNumber                string  `json:"report_number,omitempty"` // 事前申請番号
+    JPYRate                     float64 `json:"jpyrate,omitempty"`
+    Currency                    string  `json:"currency,omitempty"`
+    UseCustomJPYRate            bool    `json:"use_custom_jpy_rate,omitempty"`
+    AutomaticStatus             string  `json:"automatic_status,omitempty"`
+    OfficeMemberID              string  `json:"office_member_id"`
+    ExItemID                    string  `json:"ex_item_id,omitempty"`
+    DrExciseID                  string  `json:"dr_excise_id,omitempty"`
+    DeptID                      string  `json:"dept_id,omitempty"`
+    ProjectID                   string  `json:"project_id,omitempty"`
+    CrItemID                    string  `json:"cr_item_id,omitempty"`
+    CrSubItemID                 string  `json:"cr_sub_item_id,omitempty"`
+    InvoiceRegistrationNumber   string  `json:"invoice_registration_number,omitempty"`
+    InvoiceKind                 int     `json:"invoice_kind,omitempty"` // 1:対象外, 2:適格, 3:80%控除
+    ExciseValue                 int     `json:"excise_value,omitempty"`
+    CreatedAt                   string  `json:"created_at"`
+    UpdatedAt                   string  `json:"updated_at"`
+}
+
+// ExTransactionCreateInput は経費明細作成パラメータ。
+// required: value, recognized_at, remark, ex_item_id
+type ExTransactionCreateInput struct {
+    Remark       string  `json:"remark"`
+    RecognizedAt string  `json:"recognized_at"` // YYYY-MM-DD
+    Value        float64 `json:"value"`
+    Memo         string  `json:"memo,omitempty"`
+    ReportNumber string  `json:"report_number,omitempty"`
+    ExItemID     string  `json:"ex_item_id"`
+    DrExciseID   string  `json:"dr_excise_id,omitempty"`
+    DeptID       string  `json:"dept_id,omitempty"`
+    ProjectID    string  `json:"project_id,omitempty"`
+    CrItemID     string  `json:"cr_item_id,omitempty"`
+    CrSubItemID  string  `json:"cr_sub_item_id,omitempty"`
+    JPYRate      float64 `json:"jpyrate,omitempty"`
+    Currency     string  `json:"currency,omitempty"`
+}
+
+// ExReport は申請を表す。
+type ExReport struct {
+    ID              string `json:"id"`
+    ExReportTypeID  string `json:"ex_report_type_id,omitempty"`
+    OfficeMemberID  string `json:"office_member_id"`
+    Number          int    `json:"number"`
+    Title           string `json:"title"`
+    Status          string `json:"status"` // unsubmitted|waiting_step_one|...|approved|canceled|rejected
+    SubmittedAt     string `json:"submitted_at,omitempty"`
+    ApprovedAt      string `json:"approved_at,omitempty"`
+    CreatedAt       string `json:"created_at"`
+    UpdatedAt       string `json:"updated_at"`
+}
+
+// Dept は部門を表す。
+type Dept struct {
+    ID              string `json:"id"`
+    Code            string `json:"code,omitempty"`
+    Name            string `json:"name"`
+    DispOrder       int    `json:"disp_order,omitempty"`
+    IsActive        bool   `json:"is_active"`
+    ParentID        string `json:"parent_id,omitempty"`
+    AncestryDepth   int    `json:"ancestry_depth,omitempty"`
+    ExJournalDeptID string `json:"ex_journal_dept_id,omitempty"`
+    RootID          string `json:"root_id,omitempty"`
+}
+
+// Project はプロジェクトを表す。
+type Project struct {
+    ID        string `json:"id"`
+    Name      string `json:"name"`
+    Code      string `json:"code"`
+    IsActive  bool   `json:"is_active"`
+    DispOrder int    `json:"disp_order,omitempty"`
+    ParentID  string `json:"parent_id,omitempty"`
+    ValidFrom string `json:"valid_from"`          // date
+    ValidTo   string `json:"valid_to,omitempty"`   // date, default 9999-12-31
+}
+
+// ExItem は経費科目を表す。
+type ExItem struct {
+    ID             string `json:"id"`
+    Name           string `json:"name"`
+    Code           string `json:"code,omitempty"`
+    IsActive       bool   `json:"is_active"`
+    ItemID         string `json:"item_id,omitempty"`         // 勘定科目ID
+    SubItemID      string `json:"sub_item_id,omitempty"`     // 補助科目ID
+    DefaultExciseID string `json:"default_excise_id,omitempty"` // デフォルト税区分ID
+}
+
+// Excise は税区分を表す。
+type Excise struct {
+    ID       string  `json:"id"`
+    LongName string  `json:"long_name"`
+    Code     string  `json:"code,omitempty"`
+    Rate     float64 `json:"rate"`
+}
+
+// Position は役職を表す。
+type Position struct {
+    ID           string `json:"id"`
+    Name         string `json:"name"`
+    IsAuthorizer bool   `json:"is_authorizer"`
+    Priority     int    `json:"priority"`
+}
+
+// OfficeMemberV2 は従業員を表す (v2)。
+type OfficeMemberV2 struct {
+    ID                 string `json:"id"`
+    LoginID            string `json:"login_id,omitempty"`
+    IdentificationCode string `json:"identification_code,omitempty"`
+    Number             string `json:"number,omitempty"`
+    Name               string `json:"name"`
+    IsActive           bool   `json:"is_active"`
+    IsExUser           bool   `json:"is_ex_user"`
+    IsExAuthorizer     bool   `json:"is_ex_authorizer"`
+    IsExAdministrator  bool   `json:"is_ex_administrator"`
+    CreatedAt          string `json:"created_at"`
+    UpdatedAt          string `json:"updated_at"`
+}
+
+// ExReportUnit は集計を表す。
+type ExReportUnit struct {
     ID          string `json:"id"`
-    Amount      int    `json:"amount"`
-    Memo        string `json:"memo,omitempty"`
-    GeneratedAt string `json:"generated_at"` // YYYY-MM-DD
-    CategoryID  string `json:"ex_category_id,omitempty"`
-    DepartmentID string `json:"department_id,omitempty"`
-    ProjectID   string `json:"project_id,omitempty"`
-    TaxID       string `json:"tax_id,omitempty"`
+    OfficeID    string `json:"office_id"`
+    Number      int    `json:"number"`
+    Title       string `json:"title"`
+    PaymentDate string `json:"payment_date,omitempty"` // date
     CreatedAt   string `json:"created_at"`
     UpdatedAt   string `json:"updated_at"`
-    // *(要確認: フィールド一覧は OpenAPI spec 参照)*
 }
 
-type ExReport struct {
-    ID     string `json:"id"`
-    Title  string `json:"title"`
-    Status string `json:"status"` // submitted | approved | rejected | etc. *(要確認)*
-    // *(要確認: フィールド一覧は OpenAPI spec 参照)*
-}
-
-type ExCategory struct {
-    ID   string `json:"id"`
-    Name string `json:"name"`
-    // *(要確認)*
+// ExJournal は仕訳を表す。
+type ExJournal struct {
+    ID           string `json:"id"`
+    OfficeID     string `json:"office_id"`
+    RecognizedAt string `json:"recognized_at,omitempty"` // date
+    Memo         string `json:"memo,omitempty"`
 }
 ```
 
-### 3.4 Gotchas
+### 3.5 Enum 値
 
-- **v1 / v2 混在**: `office_members` のみ v2 エンドポイント。Base URL の切り替えが必要。
-- **スコープ**: `public_resource:read` がないとマスタデータ (カテゴリ等) が取得できない。
-- **管理者権限**: `office/` 配下のエンドポイントは Expense の管理者ロールが必要。一般ユーザーは 403。
+| 型 | 値 |
+|----|---|
+| ExReport.Status | `unsubmitted`, `waiting_step_one`, `waiting_step_two`, `waiting_step_three`, `waiting_step_four`, `waiting_step_five`, `approved`, `canceled`, `rejected` |
+| ExTransaction.AutomaticStatus | `manual`, `waiting_for_ocr_input`, `waiting_for_streamed_upload`, `waiting_for_streamed_input`, `waiting_for_input`, `input_done`, `canceled` |
+| Office.OfficeTypeID | `1` (個人), `2` (法人) |
+| InvoiceKind | `1` (対象外), `2` (適格), `3` (80%控除) |
+
+### 3.6 Gotchas
+
+- **全パスに `{office_id}` 必須**: Invoice API と異なり、事業所IDがパスに含まれる。事前に `GET /offices` で取得が必要。
+- **v1 / v2 混在**: `office_members` と `/me` は v2 エンドポイント。それ以外は v1。Base URL の切り替えが必要。
+- **v1 office_members は DEPRECATED**: 2021/05 廃止予定としてマーク済み。v2 を使用すること。
+- **スコープ**: `public_resource:read` がないとマスタデータ (経費科目等) が取得できない。
+- **管理者権限**: `office_id` 直下のエンドポイント (`/offices/{id}/ex_transactions` 等) は管理者ロールが必要。一般ユーザーは `/me/` 配下を使用。
+- **承認**: approve は POST (PATCH ではない)。reject は `disapprove` という名称。
+- **申請タイプが複数**: ExReport (経費申請), GeneralReport (事前・各種申請), SuspensePaymentReport (仮払申請) の3種類。
+- **仕訳エンドポイントが多数**: 明細ベース、申請ベース、集計ベース、支払集計ベースなど複数パターン。`recognized_at` フィルタは最大3ヶ月。
+- **API名称マッピング**: 部門=`depts` (not departments), 経費科目=`ex_items` (not ex_categories), 税区分=`excises` (not taxes)。
 
 ---
 

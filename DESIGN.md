@@ -188,44 +188,49 @@ echo '[{"name":"開発費","price":500000,"quantity":1,"excise":"ten_percent"}]'
 
 ### 2.5 expense — クラウド経費
 
-> **Base URL**: `https://expense.moneyforward.com/api/external/v1/` (v2 for office_members)
+> **Base URL (v1)**: `https://expense.moneyforward.com/api/external/v1`
+> **Base URL (v2)**: `https://expense.moneyforward.com/api/external/v2` (office_members, /me)
 > **認証**: OAuth2 (`expense.moneyforward.com/oauth/`)
 > **スコープ**: `office_setting:write`, `transaction:write`, `report:write`, `user_setting:write`, `account:write`, `public_resource:read`
-> **ページネーション**: page-based (`page`), max 25-200件/ページ
+> **ページネーション**: page-based (`page`), デフォルト 25件/ページ
+> **注意**: 全エンドポイントに `{office_id}` パスパラメータが必要 (Invoice API と異なる)
+> **API名称**: 部門=`depts`, 経費科目=`ex_items`, 税区分=`excises`
 
 ```bash
 # 事業所
 mf expense offices list
 
 # 経費明細 (自分)
-mf expense transactions list [--limit N] [--page N] [--all]
+mf expense transactions list [--page N] [--per-page N] [--all]
 mf expense transactions show <id>
-mf expense transactions create [flags]
+mf expense transactions create --remark <text> --value <amount> --date <YYYY-MM-DD> --ex-item-id <id> [flags]
 mf expense transactions update <id> [flags]
 mf expense transactions delete <id>
 
-# 経費明細 (組織全体)
-mf expense transactions list --scope org [--limit N] [--page N] [--all]
+# 経費明細 (組織全体 — 管理者権限)
+mf expense transactions list --scope org [--page N] [--per-page N] [--all]
 
-# 申請
-mf expense reports list [--limit N] [--page N] [--all]
+# 申請 (自分)
+mf expense reports list [--page N] [--per-page N] [--all]
 mf expense reports show <id>
+
+# 申請 (組織全体 — 管理者権限)
 mf expense reports list --scope org
 
 # 承認
-mf expense approvals list
+mf expense approvals list [--scope org]
 mf expense approvals approve <report-id> [--message <text>]
 mf expense approvals reject <report-id> [--message <text>]
 
 # マスタデータ
-mf expense departments list [--limit N] [--page N] [--all]
-mf expense projects list [--limit N] [--page N] [--all]
-mf expense categories list [--limit N] [--page N] [--all]
-mf expense taxes list
-mf expense positions list
+mf expense depts list [--page N] [--per-page N] [--all]
+mf expense projects list [--page N] [--per-page N] [--all]
+mf expense ex-items list [--page N] [--per-page N] [--all]
+mf expense excises list [--page N] [--per-page N] [--all]
+mf expense positions list [--page N] [--per-page N] [--all]
 
-# 従業員
-mf expense members list [--limit N] [--page N] [--all]
+# 従業員 (v2)
+mf expense members list [--page N] [--per-page N] [--all]
 mf expense members show <id>
 mf expense members me
 
@@ -507,21 +512,34 @@ mf help [command]
 
 ### Phase 3: Cloud Expense API ⬜
 
-> OpenAPI spec あり、エンドポイント最多
+> OpenAPI spec 検証済み (2026-04-01)。全パスに `{office_id}` が必要。
+> API名称: 部門=depts, 経費科目=ex_items, 税区分=excises
+> 従業員・/me は v2 エンドポイント、それ以外は v1
 
-- [ ] internal/api/expense.go
-- [ ] internal/model/expense.go
-- [ ] cmd/expense/offices (list)
-- [ ] cmd/expense/transactions (list, show, create, update, delete; --scope org)
-- [ ] cmd/expense/reports (list, show; --scope org)
-- [ ] cmd/expense/approvals (list, approve, reject)
-- [ ] cmd/expense/departments (list)
-- [ ] cmd/expense/projects (list)
-- [ ] cmd/expense/categories (list)
-- [ ] cmd/expense/taxes (list)
-- [ ] cmd/expense/positions (list)
-- [ ] cmd/expense/members (list, show, me)
-- [ ] cmd/expense/journals (list --by transactions|reports)
+#### Phase 3a: OAuth + offices + マスタデータ (read-only)
+- [ ] internal/api/expense.go (ExpenseService + v1/v2 base URL)
+- [ ] internal/model/expense.go (Office, Dept, Project, ExItem, Excise, Position)
+- [ ] cmd/expense/expense.go (ルートコマンド + newExpenseService)
+- [ ] cmd/expense/offices.go (list)
+- [ ] cmd/expense/depts.go (list, show)
+- [ ] cmd/expense/projects.go (list, show)
+- [ ] cmd/expense/ex_items.go (list, show)
+- [ ] cmd/expense/excises.go (list, show)
+- [ ] cmd/expense/positions.go (list, show)
+
+#### Phase 3b: members + transactions (CRUD + --scope org)
+- [ ] internal/model/expense.go (OfficeMemberV2, ExTransaction, ExTransactionCreateInput)
+- [ ] cmd/expense/members.go (list, show, me — v2)
+- [ ] cmd/expense/transactions.go (list, show, create, update, delete; --scope org)
+
+#### Phase 3c: reports + approvals
+- [ ] internal/model/expense.go (ExReport)
+- [ ] cmd/expense/reports.go (list, show; --scope org)
+- [ ] cmd/expense/approvals.go (list, approve, reject — POST approve/disapprove)
+
+#### Phase 3d: journals
+- [ ] internal/model/expense.go (ExJournal)
+- [ ] cmd/expense/journals.go (list --by transactions|reports; --from/--to)
 
 ### Phase 4: Cloud Payable API ⬜
 
