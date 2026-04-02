@@ -12,9 +12,8 @@ import (
 )
 
 var (
-	txListPage  int
-	txListAll   bool
-	txScope     string
+	txListPage int
+	txListAll  bool
 
 	txCreateRemark        string
 	txCreateDate          string
@@ -88,9 +87,9 @@ func init() {
 	txListCmd.Flags().IntVar(&txListPage, "page", 1, "page number")
 	txListCmd.Flags().BoolVar(&txListAll, "all", false, "fetch all pages")
 
-	// scope flag on all subcommands
-	for _, cmd := range []*cobra.Command{txListCmd, txShowCmd, txCreateCmd, txUpdateCmd, txDeleteCmd} {
-		cmd.Flags().StringVar(&txScope, "scope", "personal", `scope: "personal" or "org" (admin)`)
+	// scope flag on subcommands that support it (create is personal-only)
+	for _, cmd := range []*cobra.Command{txListCmd, txShowCmd, txUpdateCmd, txDeleteCmd} {
+		cmd.Flags().String("scope", "personal", `scope: "personal" or "org" (admin)`)
 	}
 
 	// create flags
@@ -130,11 +129,27 @@ func init() {
 	transactionsCmd.AddCommand(txListCmd, txShowCmd, txCreateCmd, txUpdateCmd, txDeleteCmd)
 }
 
-func isOrgScope() bool {
-	return txScope == "org"
+func isOrgScope(cmd *cobra.Command) bool {
+	scope, _ := cmd.Flags().GetString("scope")
+	if scope != "" && scope != "personal" && scope != "org" {
+		// Invalid value will be caught by the caller; default to personal.
+		return false
+	}
+	return scope == "org"
+}
+
+func validateScope(cmd *cobra.Command) error {
+	scope, _ := cmd.Flags().GetString("scope")
+	if scope != "personal" && scope != "org" {
+		return fmt.Errorf("invalid --scope value %q: must be \"personal\" or \"org\"", scope)
+	}
+	return nil
 }
 
 func runTxList(cmd *cobra.Command, args []string) error {
+	if err := validateScope(cmd); err != nil {
+		return err
+	}
 	svc, err := newExpenseService(cmd)
 	if err != nil {
 		return err
@@ -147,7 +162,7 @@ func runTxList(cmd *cobra.Command, args []string) error {
 	f := output.New(format)
 
 	listFn := svc.ListMyTransactions
-	if isOrgScope() {
+	if isOrgScope(cmd) {
 		listFn = svc.ListOrgTransactions
 	}
 
@@ -175,6 +190,9 @@ func runTxList(cmd *cobra.Command, args []string) error {
 }
 
 func runTxShow(cmd *cobra.Command, args []string) error {
+	if err := validateScope(cmd); err != nil {
+		return err
+	}
 	svc, err := newExpenseService(cmd)
 	if err != nil {
 		return err
@@ -185,7 +203,7 @@ func runTxShow(cmd *cobra.Command, args []string) error {
 	}
 
 	var tx *model.ExTransaction
-	if isOrgScope() {
+	if isOrgScope(cmd) {
 		tx, err = svc.GetOrgTransaction(oid, args[0])
 	} else {
 		tx, err = svc.GetMyTransaction(oid, args[0])
@@ -197,10 +215,6 @@ func runTxShow(cmd *cobra.Command, args []string) error {
 }
 
 func runTxCreate(cmd *cobra.Command, args []string) error {
-	if isOrgScope() {
-		return fmt.Errorf("create is only supported with personal scope (use default)")
-	}
-
 	svc, err := newExpenseService(cmd)
 	if err != nil {
 		return err
@@ -234,6 +248,9 @@ func runTxCreate(cmd *cobra.Command, args []string) error {
 }
 
 func runTxUpdate(cmd *cobra.Command, args []string) error {
+	if err := validateScope(cmd); err != nil {
+		return err
+	}
 	svc, err := newExpenseService(cmd)
 	if err != nil {
 		return err
@@ -285,7 +302,7 @@ func runTxUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	var tx *model.ExTransaction
-	if isOrgScope() {
+	if isOrgScope(cmd) {
 		tx, err = svc.UpdateOrgTransaction(oid, args[0], input)
 	} else {
 		tx, err = svc.UpdateMyTransaction(oid, args[0], input)
@@ -297,6 +314,9 @@ func runTxUpdate(cmd *cobra.Command, args []string) error {
 }
 
 func runTxDelete(cmd *cobra.Command, args []string) error {
+	if err := validateScope(cmd); err != nil {
+		return err
+	}
 	svc, err := newExpenseService(cmd)
 	if err != nil {
 		return err
@@ -306,7 +326,7 @@ func runTxDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if isOrgScope() {
+	if isOrgScope(cmd) {
 		err = svc.DeleteOrgTransaction(oid, args[0])
 	} else {
 		err = svc.DeleteMyTransaction(oid, args[0])
