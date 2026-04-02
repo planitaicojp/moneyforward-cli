@@ -220,3 +220,45 @@ func (s *ExpenseService) GetMe(officeID string) (*model.OfficeMemberV2, error) {
 	}
 	return &me, nil
 }
+
+// --- Transactions (v1) ---
+
+func (s *ExpenseService) ListMyTransactions(officeID string, page int) ([]model.ExTransaction, bool, error) {
+	u := fmt.Sprintf("%s/offices/%s/me/ex_transactions?page=%d",
+		s.base, url.PathEscape(officeID), page)
+	items, hasNext, err := doExpenseList[model.ExTransaction](s, u, "ex_transactions")
+	if err != nil {
+		return nil, false, fmt.Errorf("listing my transactions: %w", err)
+	}
+	return items, hasNext, nil
+}
+
+func (s *ExpenseService) GetMyTransaction(officeID, id string) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/me/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("getting my transaction: %w", err)
+	}
+	return &tx, nil
+}
+
+func (s *ExpenseService) ListOrgTransactions(officeID string, page int) ([]model.ExTransaction, bool, error) {
+	u := fmt.Sprintf("%s/offices/%s/ex_transactions?page=%d",
+		s.base, url.PathEscape(officeID), page)
+	items, hasNext, err := doExpenseList[model.ExTransaction](s, u, "ex_transactions")
+	if err != nil {
+		return nil, false, fmt.Errorf("listing org transactions: %w", err)
+	}
+	return items, hasNext, nil
+}
+
+func (s *ExpenseService) GetOrgTransaction(officeID, id string) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("getting org transaction: %w", err)
+	}
+	return &tx, nil
+}

@@ -324,3 +324,99 @@ func TestExpenseService_GetMe(t *testing.T) {
 		t.Errorf("unexpected me: %+v", me)
 	}
 }
+
+func TestExpenseService_ListMyTransactions(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/me/ex_transactions" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if p := r.URL.Query().Get("page"); p != "1" {
+			t.Errorf("page = %q, want %q", p, "1")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ex_transactions": []model.ExTransaction{
+				{ID: "tx1", Remark: "Taxi", Value: 1500, RecognizedAt: "2026-04-01"},
+			},
+			"next": nil,
+		})
+	})
+
+	txns, hasNext, err := svc.ListMyTransactions("off1", 1)
+	if err != nil {
+		t.Fatalf("ListMyTransactions() error: %v", err)
+	}
+	if len(txns) != 1 || txns[0].ID != "tx1" {
+		t.Errorf("unexpected transactions: %+v", txns)
+	}
+	if hasNext {
+		t.Error("hasNext = true, want false")
+	}
+}
+
+func TestExpenseService_GetMyTransaction(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/me/ex_transactions/tx1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.ExTransaction{
+			ID: "tx1", Remark: "Taxi", Value: 1500,
+		})
+	})
+
+	tx, err := svc.GetMyTransaction("off1", "tx1")
+	if err != nil {
+		t.Fatalf("GetMyTransaction() error: %v", err)
+	}
+	if tx.ID != "tx1" || tx.Value != 1500 {
+		t.Errorf("unexpected transaction: %+v", tx)
+	}
+}
+
+func TestExpenseService_ListOrgTransactions(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/ex_transactions" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ex_transactions": []model.ExTransaction{
+				{ID: "tx1", Remark: "Taxi", Value: 1500},
+				{ID: "tx2", Remark: "Hotel", Value: 12000},
+			},
+			"next": nil,
+		})
+	})
+
+	txns, hasNext, err := svc.ListOrgTransactions("off1", 1)
+	if err != nil {
+		t.Fatalf("ListOrgTransactions() error: %v", err)
+	}
+	if len(txns) != 2 {
+		t.Errorf("unexpected len: %d", len(txns))
+	}
+	if hasNext {
+		t.Error("hasNext = true, want false")
+	}
+}
+
+func TestExpenseService_GetOrgTransaction(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/ex_transactions/tx1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.ExTransaction{
+			ID: "tx1", Remark: "Taxi", Value: 1500,
+		})
+	})
+
+	tx, err := svc.GetOrgTransaction("off1", "tx1")
+	if err != nil {
+		t.Fatalf("GetOrgTransaction() error: %v", err)
+	}
+	if tx.ID != "tx1" {
+		t.Errorf("unexpected transaction: %+v", tx)
+	}
+}
