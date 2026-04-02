@@ -262,3 +262,43 @@ func (s *ExpenseService) GetOrgTransaction(officeID, id string) (*model.ExTransa
 	}
 	return &tx, nil
 }
+
+func (s *ExpenseService) CreateMyTransaction(officeID string, input model.ExTransactionCreateInput) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodPost, fmt.Sprintf("%s/offices/%s/me/ex_transactions",
+		s.base, url.PathEscape(officeID)), input, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("creating transaction: %w", err)
+	}
+	return &tx, nil
+}
+
+func (s *ExpenseService) UpdateMyTransaction(officeID, id string, input model.ExTransactionUpdateInput) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodPut, fmt.Sprintf("%s/offices/%s/me/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), input, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("updating my transaction: %w", err)
+	}
+	return &tx, nil
+}
+
+func (s *ExpenseService) DeleteMyTransaction(officeID, id string) error {
+	return s.client.DoJSON(http.MethodDelete, fmt.Sprintf("%s/offices/%s/me/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, nil)
+}
+
+func (s *ExpenseService) UpdateOrgTransaction(officeID, id string, input model.ExTransactionUpdateInput) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodPut, fmt.Sprintf("%s/offices/%s/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), input, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("updating org transaction: %w", err)
+	}
+	return &tx, nil
+}
+
+func (s *ExpenseService) DeleteOrgTransaction(officeID, id string) error {
+	return s.client.DoJSON(http.MethodDelete, fmt.Sprintf("%s/offices/%s/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, nil)
+}
