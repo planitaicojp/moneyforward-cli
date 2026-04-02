@@ -23,7 +23,7 @@ brews:
   - repository:
       owner: planitaicojp
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     name: mf
     homepage: "https://planitaicojp.github.io/moneyforward-cli-pages/"
     description: "CLI tool for Money Forward Cloud APIs"
