@@ -117,19 +117,19 @@ type ExTransactionCreateInput struct {
 }
 
 // ExTransactionUpdateInput is the request body for updating an expense transaction.
-// All fields are optional — only non-zero values are sent.
+// Pointer types allow distinguishing between "not provided" and "set to zero value".
 type ExTransactionUpdateInput struct {
-	Remark       string  `json:"remark,omitempty"`
-	RecognizedAt string  `json:"recognized_at,omitempty"`
-	Value        float64 `json:"value,omitempty"`
-	ExItemID     string  `json:"ex_item_id,omitempty"`
-	Memo         string  `json:"memo,omitempty"`
-	ReportNumber string  `json:"report_number,omitempty"`
-	DrExciseID   string  `json:"dr_excise_id,omitempty"`
-	DeptID       string  `json:"dept_id,omitempty"`
-	ProjectID    string  `json:"project_id,omitempty"`
-	CrItemID     string  `json:"cr_item_id,omitempty"`
-	CrSubItemID  string  `json:"cr_sub_item_id,omitempty"`
-	JPYRate      float64 `json:"jpyrate,omitempty"`
-	Currency     string  `json:"currency,omitempty"`
+	Remark       *string  `json:"remark,omitempty"`
+	RecognizedAt *string  `json:"recognized_at,omitempty"`
+	Value        *float64 `json:"value,omitempty"`
+	ExItemID     *string  `json:"ex_item_id,omitempty"`
+	Memo         *string  `json:"memo,omitempty"`
+	ReportNumber *string  `json:"report_number,omitempty"`
+	DrExciseID   *string  `json:"dr_excise_id,omitempty"`
+	DeptID       *string  `json:"dept_id,omitempty"`
+	ProjectID    *string  `json:"project_id,omitempty"`
+	CrItemID     *string  `json:"cr_item_id,omitempty"`
+	CrSubItemID  *string  `json:"cr_sub_item_id,omitempty"`
+	JPYRate      *float64 `json:"jpyrate,omitempty"`
+	Currency     *string  `json:"currency,omitempty"`
 }

@@ -16,31 +16,33 @@ var (
 	txListAll   bool
 	txScope     string
 
-	txCreateRemark      string
-	txCreateDate        string
-	txCreateValue       float64
-	txCreateExItemID    string
-	txCreateMemo        string
-	txCreateDeptID      string
-	txCreateProjectID   string
-	txCreateDrExciseID  string
-	txCreateCrItemID    string
-	txCreateCrSubItemID string
-	txCreateJPYRate     float64
-	txCreateCurrency    string
+	txCreateRemark        string
+	txCreateDate          string
+	txCreateValue         float64
+	txCreateExItemID      string
+	txCreateMemo          string
+	txCreateReportNumber  string
+	txCreateDeptID        string
+	txCreateProjectID     string
+	txCreateDrExciseID    string
+	txCreateCrItemID      string
+	txCreateCrSubItemID   string
+	txCreateJPYRate       float64
+	txCreateCurrency      string
 
-	txUpdateRemark      string
-	txUpdateDate        string
-	txUpdateValue       float64
-	txUpdateExItemID    string
-	txUpdateMemo        string
-	txUpdateDeptID      string
-	txUpdateProjectID   string
-	txUpdateDrExciseID  string
-	txUpdateCrItemID    string
-	txUpdateCrSubItemID string
-	txUpdateJPYRate     float64
-	txUpdateCurrency    string
+	txUpdateRemark        string
+	txUpdateDate          string
+	txUpdateValue         float64
+	txUpdateExItemID      string
+	txUpdateMemo          string
+	txUpdateReportNumber  string
+	txUpdateDeptID        string
+	txUpdateProjectID     string
+	txUpdateDrExciseID    string
+	txUpdateCrItemID      string
+	txUpdateCrSubItemID   string
+	txUpdateJPYRate       float64
+	txUpdateCurrency      string
 )
 
 var transactionsCmd = &cobra.Command{
@@ -97,6 +99,7 @@ func init() {
 	txCreateCmd.Flags().Float64Var(&txCreateValue, "value", 0, "amount including tax (required)")
 	txCreateCmd.Flags().StringVar(&txCreateExItemID, "ex-item-id", "", "expense category ID (required)")
 	txCreateCmd.Flags().StringVar(&txCreateMemo, "memo", "", "memo")
+	txCreateCmd.Flags().StringVar(&txCreateReportNumber, "report-number", "", "report number")
 	txCreateCmd.Flags().StringVar(&txCreateDeptID, "dept-id", "", "department ID")
 	txCreateCmd.Flags().StringVar(&txCreateProjectID, "project-id", "", "project ID")
 	txCreateCmd.Flags().StringVar(&txCreateDrExciseID, "dr-excise-id", "", "debit tax classification ID")
@@ -115,6 +118,7 @@ func init() {
 	txUpdateCmd.Flags().Float64Var(&txUpdateValue, "value", 0, "amount including tax")
 	txUpdateCmd.Flags().StringVar(&txUpdateExItemID, "ex-item-id", "", "expense category ID")
 	txUpdateCmd.Flags().StringVar(&txUpdateMemo, "memo", "", "memo")
+	txUpdateCmd.Flags().StringVar(&txUpdateReportNumber, "report-number", "", "report number")
 	txUpdateCmd.Flags().StringVar(&txUpdateDeptID, "dept-id", "", "department ID")
 	txUpdateCmd.Flags().StringVar(&txUpdateProjectID, "project-id", "", "project ID")
 	txUpdateCmd.Flags().StringVar(&txUpdateDrExciseID, "dr-excise-id", "", "debit tax classification ID")
@@ -212,6 +216,7 @@ func runTxCreate(cmd *cobra.Command, args []string) error {
 		Value:        txCreateValue,
 		ExItemID:     txCreateExItemID,
 		Memo:         txCreateMemo,
+		ReportNumber: txCreateReportNumber,
 		DeptID:       txCreateDeptID,
 		ProjectID:    txCreateProjectID,
 		DrExciseID:   txCreateDrExciseID,
@@ -238,19 +243,45 @@ func runTxUpdate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	input := model.ExTransactionUpdateInput{
-		Remark:       txUpdateRemark,
-		RecognizedAt: txUpdateDate,
-		Value:        txUpdateValue,
-		ExItemID:     txUpdateExItemID,
-		Memo:         txUpdateMemo,
-		DeptID:       txUpdateDeptID,
-		ProjectID:    txUpdateProjectID,
-		DrExciseID:   txUpdateDrExciseID,
-		CrItemID:     txUpdateCrItemID,
-		CrSubItemID:  txUpdateCrSubItemID,
-		JPYRate:      txUpdateJPYRate,
-		Currency:     txUpdateCurrency,
+	var input model.ExTransactionUpdateInput
+	if cmd.Flags().Changed("remark") {
+		input.Remark = &txUpdateRemark
+	}
+	if cmd.Flags().Changed("date") {
+		input.RecognizedAt = &txUpdateDate
+	}
+	if cmd.Flags().Changed("value") {
+		input.Value = &txUpdateValue
+	}
+	if cmd.Flags().Changed("ex-item-id") {
+		input.ExItemID = &txUpdateExItemID
+	}
+	if cmd.Flags().Changed("memo") {
+		input.Memo = &txUpdateMemo
+	}
+	if cmd.Flags().Changed("report-number") {
+		input.ReportNumber = &txUpdateReportNumber
+	}
+	if cmd.Flags().Changed("dr-excise-id") {
+		input.DrExciseID = &txUpdateDrExciseID
+	}
+	if cmd.Flags().Changed("dept-id") {
+		input.DeptID = &txUpdateDeptID
+	}
+	if cmd.Flags().Changed("project-id") {
+		input.ProjectID = &txUpdateProjectID
+	}
+	if cmd.Flags().Changed("cr-item-id") {
+		input.CrItemID = &txUpdateCrItemID
+	}
+	if cmd.Flags().Changed("cr-sub-item-id") {
+		input.CrSubItemID = &txUpdateCrSubItemID
+	}
+	if cmd.Flags().Changed("jpyrate") {
+		input.JPYRate = &txUpdateJPYRate
+	}
+	if cmd.Flags().Changed("currency") {
+		input.Currency = &txUpdateCurrency
 	}
 
 	var tx *model.ExTransaction

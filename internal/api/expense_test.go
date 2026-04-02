@@ -10,6 +10,9 @@ import (
 	"github.com/planitaicojp/moneyforward-cli/internal/model"
 )
 
+func strPtr(s string) *string    { return &s }
+func f64Ptr(f float64) *float64  { return &f }
+
 func newTestExpenseService(t *testing.T, handler http.HandlerFunc) *api.ExpenseService {
 	t.Helper()
 	srv := httptest.NewServer(handler)
@@ -468,7 +471,7 @@ func TestExpenseService_UpdateMyTransaction(t *testing.T) {
 		})
 	})
 
-	input := model.ExTransactionUpdateInput{Remark: "Updated", Value: 2000}
+	input := model.ExTransactionUpdateInput{Remark: strPtr("Updated"), Value: f64Ptr(2000)}
 	tx, err := svc.UpdateMyTransaction("off1", "tx1", input)
 	if err != nil {
 		t.Fatalf("UpdateMyTransaction() error: %v", err)
@@ -509,7 +512,7 @@ func TestExpenseService_UpdateOrgTransaction(t *testing.T) {
 		})
 	})
 
-	input := model.ExTransactionUpdateInput{Remark: "OrgUpdate", Value: 3000}
+	input := model.ExTransactionUpdateInput{Remark: strPtr("OrgUpdate"), Value: f64Ptr(3000)}
 	tx, err := svc.UpdateOrgTransaction("off1", "tx1", input)
 	if err != nil {
 		t.Fatalf("UpdateOrgTransaction() error: %v", err)
