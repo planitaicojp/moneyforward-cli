@@ -189,3 +189,116 @@ func (s *ExpenseService) GetPosition(officeID, id string) (*model.Position, erro
 	}
 	return &pos, nil
 }
+
+// --- Members (v2) ---
+func (s *ExpenseService) ListMembersV2(officeID string, page int, onlyActive bool) ([]model.OfficeMemberV2, bool, error) {
+	u := fmt.Sprintf("%s/offices/%s/office_members?page=%d&only_active=%t",
+		s.baseV2, url.PathEscape(officeID), page, onlyActive)
+	items, hasNext, err := doExpenseList[model.OfficeMemberV2](s, u, "office_members")
+	if err != nil {
+		return nil, false, fmt.Errorf("listing members: %w", err)
+	}
+	return items, hasNext, nil
+}
+
+func (s *ExpenseService) GetMemberV2(officeID, id string) (*model.OfficeMemberV2, error) {
+	var member model.OfficeMemberV2
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/office_members/%s",
+		s.baseV2, url.PathEscape(officeID), url.PathEscape(id)), nil, &member)
+	if err != nil {
+		return nil, fmt.Errorf("getting member: %w", err)
+	}
+	return &member, nil
+}
+
+func (s *ExpenseService) GetMe(officeID string) (*model.OfficeMemberV2, error) {
+	var me model.OfficeMemberV2
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/me",
+		s.baseV2, url.PathEscape(officeID)), nil, &me)
+	if err != nil {
+		return nil, fmt.Errorf("getting me: %w", err)
+	}
+	return &me, nil
+}
+
+// --- Transactions (v1) ---
+
+func (s *ExpenseService) ListMyTransactions(officeID string, page int) ([]model.ExTransaction, bool, error) {
+	u := fmt.Sprintf("%s/offices/%s/me/ex_transactions?page=%d",
+		s.base, url.PathEscape(officeID), page)
+	items, hasNext, err := doExpenseList[model.ExTransaction](s, u, "ex_transactions")
+	if err != nil {
+		return nil, false, fmt.Errorf("listing my transactions: %w", err)
+	}
+	return items, hasNext, nil
+}
+
+func (s *ExpenseService) GetMyTransaction(officeID, id string) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/me/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("getting my transaction: %w", err)
+	}
+	return &tx, nil
+}
+
+func (s *ExpenseService) ListOrgTransactions(officeID string, page int) ([]model.ExTransaction, bool, error) {
+	u := fmt.Sprintf("%s/offices/%s/ex_transactions?page=%d",
+		s.base, url.PathEscape(officeID), page)
+	items, hasNext, err := doExpenseList[model.ExTransaction](s, u, "ex_transactions")
+	if err != nil {
+		return nil, false, fmt.Errorf("listing org transactions: %w", err)
+	}
+	return items, hasNext, nil
+}
+
+func (s *ExpenseService) GetOrgTransaction(officeID, id string) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("getting org transaction: %w", err)
+	}
+	return &tx, nil
+}
+
+func (s *ExpenseService) CreateMyTransaction(officeID string, input model.ExTransactionCreateInput) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodPost, fmt.Sprintf("%s/offices/%s/me/ex_transactions",
+		s.base, url.PathEscape(officeID)), input, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("creating transaction: %w", err)
+	}
+	return &tx, nil
+}
+
+func (s *ExpenseService) UpdateMyTransaction(officeID, id string, input model.ExTransactionUpdateInput) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodPut, fmt.Sprintf("%s/offices/%s/me/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), input, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("updating my transaction: %w", err)
+	}
+	return &tx, nil
+}
+
+func (s *ExpenseService) DeleteMyTransaction(officeID, id string) error {
+	return s.client.DoJSON(http.MethodDelete, fmt.Sprintf("%s/offices/%s/me/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, nil)
+}
+
+func (s *ExpenseService) UpdateOrgTransaction(officeID, id string, input model.ExTransactionUpdateInput) (*model.ExTransaction, error) {
+	var tx model.ExTransaction
+	err := s.client.DoJSON(http.MethodPut, fmt.Sprintf("%s/offices/%s/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), input, &tx)
+	if err != nil {
+		return nil, fmt.Errorf("updating org transaction: %w", err)
+	}
+	return &tx, nil
+}
+
+func (s *ExpenseService) DeleteOrgTransaction(officeID, id string) error {
+	return s.client.DoJSON(http.MethodDelete, fmt.Sprintf("%s/offices/%s/ex_transactions/%s",
+		s.base, url.PathEscape(officeID), url.PathEscape(id)), nil, nil)
+}

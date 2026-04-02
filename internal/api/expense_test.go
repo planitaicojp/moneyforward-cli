@@ -10,6 +10,9 @@ import (
 	"github.com/planitaicojp/moneyforward-cli/internal/model"
 )
 
+func strPtr(s string) *string    { return &s }
+func f64Ptr(f float64) *float64  { return &f }
+
 func newTestExpenseService(t *testing.T, handler http.HandlerFunc) *api.ExpenseService {
 	t.Helper()
 	srv := httptest.NewServer(handler)
@@ -250,5 +253,288 @@ func TestExpenseService_GetProject(t *testing.T) {
 	}
 	if project.Name != "Project Alpha" {
 		t.Errorf("project.Name = %q, want %q", project.Name, "Project Alpha")
+	}
+}
+
+func TestExpenseService_ListMembersV2(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v2/offices/off1/office_members" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if p := r.URL.Query().Get("page"); p != "1" {
+			t.Errorf("page = %q, want %q", p, "1")
+		}
+		if oa := r.URL.Query().Get("only_active"); oa != "true" {
+			t.Errorf("only_active = %q, want %q", oa, "true")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"office_members": []model.OfficeMemberV2{
+				{ID: "m1", Name: "Taro", IsActive: true},
+			},
+			"next": nil,
+		})
+	})
+
+	members, hasNext, err := svc.ListMembersV2("off1", 1, true)
+	if err != nil {
+		t.Fatalf("ListMembersV2() error: %v", err)
+	}
+	if len(members) != 1 || members[0].ID != "m1" {
+		t.Errorf("unexpected members: %+v", members)
+	}
+	if hasNext {
+		t.Error("hasNext = true, want false")
+	}
+}
+
+func TestExpenseService_GetMemberV2(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v2/offices/off1/office_members/m1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.OfficeMemberV2{
+			ID: "m1", Name: "Taro", IsActive: true,
+		})
+	})
+
+	member, err := svc.GetMemberV2("off1", "m1")
+	if err != nil {
+		t.Fatalf("GetMemberV2() error: %v", err)
+	}
+	if member.ID != "m1" || member.Name != "Taro" {
+		t.Errorf("unexpected member: %+v", member)
+	}
+}
+
+func TestExpenseService_GetMe(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v2/offices/off1/me" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.OfficeMemberV2{
+			ID: "m1", Name: "Taro", IsActive: true, IsExUser: true,
+		})
+	})
+
+	me, err := svc.GetMe("off1")
+	if err != nil {
+		t.Fatalf("GetMe() error: %v", err)
+	}
+	if me.ID != "m1" || !me.IsExUser {
+		t.Errorf("unexpected me: %+v", me)
+	}
+}
+
+func TestExpenseService_ListMyTransactions(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/me/ex_transactions" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if p := r.URL.Query().Get("page"); p != "1" {
+			t.Errorf("page = %q, want %q", p, "1")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ex_transactions": []model.ExTransaction{
+				{ID: "tx1", Remark: "Taxi", Value: 1500, RecognizedAt: "2026-04-01"},
+			},
+			"next": nil,
+		})
+	})
+
+	txns, hasNext, err := svc.ListMyTransactions("off1", 1)
+	if err != nil {
+		t.Fatalf("ListMyTransactions() error: %v", err)
+	}
+	if len(txns) != 1 || txns[0].ID != "tx1" {
+		t.Errorf("unexpected transactions: %+v", txns)
+	}
+	if hasNext {
+		t.Error("hasNext = true, want false")
+	}
+}
+
+func TestExpenseService_GetMyTransaction(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/me/ex_transactions/tx1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.ExTransaction{
+			ID: "tx1", Remark: "Taxi", Value: 1500,
+		})
+	})
+
+	tx, err := svc.GetMyTransaction("off1", "tx1")
+	if err != nil {
+		t.Fatalf("GetMyTransaction() error: %v", err)
+	}
+	if tx.ID != "tx1" || tx.Value != 1500 {
+		t.Errorf("unexpected transaction: %+v", tx)
+	}
+}
+
+func TestExpenseService_ListOrgTransactions(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/ex_transactions" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ex_transactions": []model.ExTransaction{
+				{ID: "tx1", Remark: "Taxi", Value: 1500},
+				{ID: "tx2", Remark: "Hotel", Value: 12000},
+			},
+			"next": nil,
+		})
+	})
+
+	txns, hasNext, err := svc.ListOrgTransactions("off1", 1)
+	if err != nil {
+		t.Fatalf("ListOrgTransactions() error: %v", err)
+	}
+	if len(txns) != 2 {
+		t.Errorf("unexpected len: %d", len(txns))
+	}
+	if hasNext {
+		t.Error("hasNext = true, want false")
+	}
+}
+
+func TestExpenseService_GetOrgTransaction(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v1/offices/off1/ex_transactions/tx1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.ExTransaction{
+			ID: "tx1", Remark: "Taxi", Value: 1500,
+		})
+	})
+
+	tx, err := svc.GetOrgTransaction("off1", "tx1")
+	if err != nil {
+		t.Fatalf("GetOrgTransaction() error: %v", err)
+	}
+	if tx.ID != "tx1" {
+		t.Errorf("unexpected transaction: %+v", tx)
+	}
+}
+
+func TestExpenseService_CreateMyTransaction(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s, want POST", r.Method)
+		}
+		if r.URL.Path != "/api/external/v1/offices/off1/me/ex_transactions" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		var input model.ExTransactionCreateInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if input.Remark != "Taxi" || input.Value != 1500 {
+			t.Errorf("unexpected input: %+v", input)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.ExTransaction{
+			ID: "tx-new", Remark: input.Remark, Value: input.Value,
+		})
+	})
+
+	input := model.ExTransactionCreateInput{
+		Remark: "Taxi", RecognizedAt: "2026-04-01", Value: 1500, ExItemID: "ei1",
+	}
+	tx, err := svc.CreateMyTransaction("off1", input)
+	if err != nil {
+		t.Fatalf("CreateMyTransaction() error: %v", err)
+	}
+	if tx.ID != "tx-new" {
+		t.Errorf("unexpected tx: %+v", tx)
+	}
+}
+
+func TestExpenseService_UpdateMyTransaction(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Errorf("method = %s, want PUT", r.Method)
+		}
+		if r.URL.Path != "/api/external/v1/offices/off1/me/ex_transactions/tx1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.ExTransaction{
+			ID: "tx1", Remark: "Updated", Value: 2000,
+		})
+	})
+
+	input := model.ExTransactionUpdateInput{Remark: strPtr("Updated"), Value: f64Ptr(2000)}
+	tx, err := svc.UpdateMyTransaction("off1", "tx1", input)
+	if err != nil {
+		t.Fatalf("UpdateMyTransaction() error: %v", err)
+	}
+	if tx.Remark != "Updated" {
+		t.Errorf("unexpected remark: %s", tx.Remark)
+	}
+}
+
+func TestExpenseService_DeleteMyTransaction(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("method = %s, want DELETE", r.Method)
+		}
+		if r.URL.Path != "/api/external/v1/offices/off1/me/ex_transactions/tx1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := svc.DeleteMyTransaction("off1", "tx1")
+	if err != nil {
+		t.Fatalf("DeleteMyTransaction() error: %v", err)
+	}
+}
+
+func TestExpenseService_UpdateOrgTransaction(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Errorf("method = %s, want PUT", r.Method)
+		}
+		if r.URL.Path != "/api/external/v1/offices/off1/ex_transactions/tx1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.ExTransaction{
+			ID: "tx1", Remark: "OrgUpdate", Value: 3000,
+		})
+	})
+
+	input := model.ExTransactionUpdateInput{Remark: strPtr("OrgUpdate"), Value: f64Ptr(3000)}
+	tx, err := svc.UpdateOrgTransaction("off1", "tx1", input)
+	if err != nil {
+		t.Fatalf("UpdateOrgTransaction() error: %v", err)
+	}
+	if tx.Remark != "OrgUpdate" {
+		t.Errorf("unexpected remark: %s", tx.Remark)
+	}
+}
+
+func TestExpenseService_DeleteOrgTransaction(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("method = %s, want DELETE", r.Method)
+		}
+		if r.URL.Path != "/api/external/v1/offices/off1/ex_transactions/tx1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := svc.DeleteOrgTransaction("off1", "tx1")
+	if err != nil {
+		t.Fatalf("DeleteOrgTransaction() error: %v", err)
 	}
 }

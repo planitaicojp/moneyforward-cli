@@ -55,3 +55,81 @@ type Position struct {
 	IsAuthorizer bool   `json:"is_authorizer"`
 	Priority     int    `json:"priority"`
 }
+
+// OfficeMemberV2 is an employee from the Expense v2 API.
+type OfficeMemberV2 struct {
+	ID                 string `json:"id"`
+	LoginID            string `json:"login_id,omitempty"`
+	IdentificationCode string `json:"identification_code,omitempty"`
+	Number             string `json:"number,omitempty"`
+	Name               string `json:"name"`
+	IsActive           bool   `json:"is_active"`
+	IsExUser           bool   `json:"is_ex_user"`
+	IsExAuthorizer     bool   `json:"is_ex_authorizer"`
+	IsExAdministrator  bool   `json:"is_ex_administrator"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
+}
+
+// ExTransaction is an expense transaction.
+type ExTransaction struct {
+	ID                        string  `json:"id"`
+	Number                    int     `json:"number"`
+	Remark                    string  `json:"remark"`
+	RecognizedAt              string  `json:"recognized_at"`
+	Value                     float64 `json:"value"`
+	Memo                      string  `json:"memo,omitempty"`
+	ReportNumber              string  `json:"report_number,omitempty"`
+	JPYRate                   float64 `json:"jpyrate,omitempty"`
+	Currency                  string  `json:"currency,omitempty"`
+	UseCustomJPYRate          bool    `json:"use_custom_jpy_rate,omitempty"`
+	AutomaticStatus           string  `json:"automatic_status,omitempty"`
+	OfficeMemberID            string  `json:"office_member_id"`
+	ExItemID                  string  `json:"ex_item_id,omitempty"`
+	DrExciseID                string  `json:"dr_excise_id,omitempty"`
+	DeptID                    string  `json:"dept_id,omitempty"`
+	ProjectID                 string  `json:"project_id,omitempty"`
+	CrItemID                  string  `json:"cr_item_id,omitempty"`
+	CrSubItemID               string  `json:"cr_sub_item_id,omitempty"`
+	InvoiceRegistrationNumber string  `json:"invoice_registration_number,omitempty"`
+	InvoiceKind               int     `json:"invoice_kind,omitempty"`
+	ExciseValue               int     `json:"excise_value,omitempty"`
+	CreatedAt                 string  `json:"created_at"`
+	UpdatedAt                 string  `json:"updated_at"`
+}
+
+// ExTransactionCreateInput is the request body for creating an expense transaction.
+// Required fields: Remark, RecognizedAt, Value, ExItemID.
+type ExTransactionCreateInput struct {
+	Remark       string  `json:"remark"`
+	RecognizedAt string  `json:"recognized_at"`
+	Value        float64 `json:"value"`
+	ExItemID     string  `json:"ex_item_id"`
+	Memo         string  `json:"memo,omitempty"`
+	ReportNumber string  `json:"report_number,omitempty"`
+	DrExciseID   string  `json:"dr_excise_id,omitempty"`
+	DeptID       string  `json:"dept_id,omitempty"`
+	ProjectID    string  `json:"project_id,omitempty"`
+	CrItemID     string  `json:"cr_item_id,omitempty"`
+	CrSubItemID  string  `json:"cr_sub_item_id,omitempty"`
+	JPYRate      float64 `json:"jpyrate,omitempty"`
+	Currency     string  `json:"currency,omitempty"`
+}
+
+// ExTransactionUpdateInput is the request body for updating an expense transaction.
+// Pointer types allow distinguishing between "not provided" and "set to zero value".
+type ExTransactionUpdateInput struct {
+	Remark       *string  `json:"remark,omitempty"`
+	RecognizedAt *string  `json:"recognized_at,omitempty"`
+	Value        *float64 `json:"value,omitempty"`
+	ExItemID     *string  `json:"ex_item_id,omitempty"`
+	Memo         *string  `json:"memo,omitempty"`
+	ReportNumber *string  `json:"report_number,omitempty"`
+	DrExciseID   *string  `json:"dr_excise_id,omitempty"`
+	DeptID       *string  `json:"dept_id,omitempty"`
+	ProjectID    *string  `json:"project_id,omitempty"`
+	CrItemID     *string  `json:"cr_item_id,omitempty"`
+	CrSubItemID  *string  `json:"cr_sub_item_id,omitempty"`
+	JPYRate      *float64 `json:"jpyrate,omitempty"`
+	Currency     *string  `json:"currency,omitempty"`
+}

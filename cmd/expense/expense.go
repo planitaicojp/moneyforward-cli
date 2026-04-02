@@ -28,6 +28,8 @@ func init() {
 	ExpenseCmd.AddCommand(categoriesCmd)
 	ExpenseCmd.AddCommand(taxesCmd)
 	ExpenseCmd.AddCommand(positionsCmd)
+	ExpenseCmd.AddCommand(membersCmd)
+	ExpenseCmd.AddCommand(transactionsCmd)
 }
 
 func newExpenseService(cmd *cobra.Command) (*api.ExpenseService, error) {
