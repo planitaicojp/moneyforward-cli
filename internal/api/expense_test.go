@@ -252,3 +252,75 @@ func TestExpenseService_GetProject(t *testing.T) {
 		t.Errorf("project.Name = %q, want %q", project.Name, "Project Alpha")
 	}
 }
+
+func TestExpenseService_ListMembersV2(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v2/offices/off1/office_members" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if p := r.URL.Query().Get("page"); p != "1" {
+			t.Errorf("page = %q, want %q", p, "1")
+		}
+		if oa := r.URL.Query().Get("only_active"); oa != "true" {
+			t.Errorf("only_active = %q, want %q", oa, "true")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"office_members": []model.OfficeMemberV2{
+				{ID: "m1", Name: "Taro", IsActive: true},
+			},
+			"next": nil,
+		})
+	})
+
+	members, hasNext, err := svc.ListMembersV2("off1", 1, true)
+	if err != nil {
+		t.Fatalf("ListMembersV2() error: %v", err)
+	}
+	if len(members) != 1 || members[0].ID != "m1" {
+		t.Errorf("unexpected members: %+v", members)
+	}
+	if hasNext {
+		t.Error("hasNext = true, want false")
+	}
+}
+
+func TestExpenseService_GetMemberV2(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v2/offices/off1/office_members/m1" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.OfficeMemberV2{
+			ID: "m1", Name: "Taro", IsActive: true,
+		})
+	})
+
+	member, err := svc.GetMemberV2("off1", "m1")
+	if err != nil {
+		t.Fatalf("GetMemberV2() error: %v", err)
+	}
+	if member.ID != "m1" || member.Name != "Taro" {
+		t.Errorf("unexpected member: %+v", member)
+	}
+}
+
+func TestExpenseService_GetMe(t *testing.T) {
+	svc := newTestExpenseService(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/external/v2/offices/off1/me" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(model.OfficeMemberV2{
+			ID: "m1", Name: "Taro", IsActive: true, IsExUser: true,
+		})
+	})
+
+	me, err := svc.GetMe("off1")
+	if err != nil {
+		t.Fatalf("GetMe() error: %v", err)
+	}
+	if me.ID != "m1" || !me.IsExUser {
+		t.Errorf("unexpected me: %+v", me)
+	}
+}

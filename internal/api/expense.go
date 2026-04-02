@@ -189,3 +189,34 @@ func (s *ExpenseService) GetPosition(officeID, id string) (*model.Position, erro
 	}
 	return &pos, nil
 }
+
+// --- Members (v2) ---
+func (s *ExpenseService) ListMembersV2(officeID string, page int, onlyActive bool) ([]model.OfficeMemberV2, bool, error) {
+	u := fmt.Sprintf("%s/offices/%s/office_members?page=%d&only_active=%t",
+		s.baseV2, url.PathEscape(officeID), page, onlyActive)
+	items, hasNext, err := doExpenseList[model.OfficeMemberV2](s, u, "office_members")
+	if err != nil {
+		return nil, false, fmt.Errorf("listing members: %w", err)
+	}
+	return items, hasNext, nil
+}
+
+func (s *ExpenseService) GetMemberV2(officeID, id string) (*model.OfficeMemberV2, error) {
+	var member model.OfficeMemberV2
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/office_members/%s",
+		s.baseV2, url.PathEscape(officeID), url.PathEscape(id)), nil, &member)
+	if err != nil {
+		return nil, fmt.Errorf("getting member: %w", err)
+	}
+	return &member, nil
+}
+
+func (s *ExpenseService) GetMe(officeID string) (*model.OfficeMemberV2, error) {
+	var me model.OfficeMemberV2
+	err := s.client.DoJSON(http.MethodGet, fmt.Sprintf("%s/offices/%s/me",
+		s.baseV2, url.PathEscape(officeID)), nil, &me)
+	if err != nil {
+		return nil, fmt.Errorf("getting me: %w", err)
+	}
+	return &me, nil
+}
