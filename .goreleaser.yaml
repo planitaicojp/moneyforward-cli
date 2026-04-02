@@ -19,6 +19,20 @@ archives:
       - goos: windows
         format: zip
 
+brews:
+  - repository:
+      owner: planitaicojp
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    name: mf
+    homepage: "https://planitaicojp.github.io/moneyforward-cli-pages/"
+    description: "CLI tool for Money Forward Cloud APIs"
+    license: "Apache-2.0"
+    install: |
+      bin.install "mf"
+    test: |
+      system "#{bin}/mf", "version"
+
 checksum:
   name_template: "checksums.txt"
 
