@@ -144,7 +144,7 @@ func runPartnersList(cmd *cobra.Command, args []string) error {
 	f := output.New(format)
 
 	if partnersListAll {
-		allPartners, err := fetchAll(func(page int) ([]model.Partner, *pagination.Result, error) {
+		allPartners, err := cmdutil.FetchAll(func(page int) ([]model.Partner, *pagination.Result, error) {
 			return svc.ListPartners(pagination.Params{Page: page, PerPage: 100}, partnersListQuery)
 		})
 		if err != nil {
